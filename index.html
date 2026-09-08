@@ -297,6 +297,8 @@
         .ai-msg.bot { background: #f1f5f9; margin-right: auto; border-bottom-left-radius: 4px; }
         .ai-msg .ai-thinking { display: inline-block; animation: pulse 1.2s ease-in-out infinite; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        .ai-msg .med-btn { display: inline-block; padding: 4px 14px; background: var(--accent); color: #fff; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 4px 4px 0 0; cursor: pointer; border: none; }
+        .ai-msg .med-btn:hover { background: var(--accent-dark); }
 
         /* Responsive */
         @media (max-width:1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr) } .pos-grid { grid-template-columns: 1fr } .two-col { grid-template-columns: 1fr } }
@@ -632,7 +634,7 @@
                 </div>
             </section>
 
-            <!-- INVOICES (HISTORICAL BILL REPOSITORY) -->
+            <!-- INVOICES -->
             <section class="view" id="view-invoices">
                 <div class="page-head"><div><h2>Historical Bill Repository</h2><p>Permanent archive of every dispatched invoice.</p></div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -765,8 +767,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: Auto-return from invoice, WhatsApp share, Month/Year auto-format
-        //  Removed separate Returns sidebar, integrated into invoice history
+        //  FIXED: Return modal with medicine selection, WhatsApp sharing, Details, AI cart add
         // =========================================================================
 
         // ---------- CONFIG ----------
@@ -858,11 +859,7 @@
                 return d.toLocaleString('default', { month: 'long', year: 'numeric' });
             }
             static formatMonthYear(input) {
-                // Auto-format: 092026 -> 09/2026
                 let val = input.replace(/\D/g, '');
-                if (val.length >= 2 && val.length < 4) {
-                    return val;
-                }
                 if (val.length >= 4) {
                     const month = val.substring(0, 2);
                     const year = val.substring(2, 6);
@@ -1715,167 +1712,116 @@
                         } });
             }
 
-            // ---------- RETURN FROM INVOICE (AUTOMATIC) ----------
-            static returnFromInvoice(invoiceId) {
-                const inv = InvoiceManager.find(invoiceId);
-                if (!inv) { Toast.error("Invoice not found"); return; }
-
-                // Check if invoice is older than 7 days
-                const invDate = new Date(inv.timestamp);
-                const now = new Date();
-                const daysDiff = (now - invDate) / (1000 * 60 * 60 * 24);
-                if (daysDiff > 7) {
-                    Toast.error("Return window expired",
-                        "This invoice is older than 7 days. Returns are only allowed within 7 days of purchase.");
-                    return;
-                }
-
-                // Show return modal with invoice items - AUTO POPULATE
-                const itemsHtml = inv.items.map((item, idx) => {
-                    const maxQty = item.quantity;
-                    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
-                        <span><strong>${Utils.esc(item.name)}</strong> <small style="color:var(--slate-500)">${Utils.esc(item.batchId)}</small></span>
-                        <span>Qty: ${item.quantity} × ₹${item.price} = ₹${item.lineTotal}</span>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <input type="number" id="returnQty_${idx}" min="0" max="${maxQty}" value="${maxQty}" style="width:70px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;" />
-                            <span style="font-size:12px;color:var(--slate-500)">/ ${maxQty}</span>
-                        </div>
-                    </div>`;
-                }).join('');
+            // ---------- RETURN MODAL WITH MEDICINE SELECTION ----------
+            static openReturnModal() {
+                const meds = Inventory.all().filter(m => m.stock > 0 && !Utils.isExpired(m.expiryMonth, m.expiryYear));
+                const medOptions = meds.map(m =>
+                    `<option value="${Utils.esc(m.id)}">${Utils.esc(m.name)} (${Utils.esc(m.batchId)}) - ${m.stock} units</option>`
+                ).join('');
 
                 Modal.open({
-                    title: "↩️ Return Items from Invoice",
-                    subtitle: `${inv.id} - ${inv.customer.name} - ₹${inv.total.toFixed(2)} refundable`,
+                    title: "↩️ Add Return",
+                    subtitle: "Record a medicine return",
                     body: `
-                        <p style="margin-bottom:12px;color:var(--slate-500);">Select quantities to return. Click "Process Return" to complete.</p>
-                        <p style="margin-bottom:12px;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:13px;color:#166534;">
-                            💰 Total Refund Amount: <strong>₹${inv.total.toFixed(2)}</strong>
-                        </p>
-                        <div style="max-height:300px;overflow-y:auto;">
-                            ${itemsHtml}
+                        <div class="field">
+                            <label class="field-label" for="returnMed">Select Medicine</label>
+                            <select class="input" id="returnMed">
+                                <option value="">Select Medicine</option>
+                                ${medOptions}
+                            </select>
+                            <span class="err" id="errReturnMed"></span>
                         </div>
-                        <div class="field" style="margin-top:12px;">
-                            <label class="field-label" for="returnReasonInvoice">Reason for Return</label>
-                            <input class="input" id="returnReasonInvoice" placeholder="e.g. Expired, Damaged, Wrong item, Customer request" value="Customer return" />
+                        <div class="field">
+                            <label class="field-label" for="returnQty">Quantity Returned</label>
+                            <input class="input" id="returnQty" type="number" min="1" placeholder="Enter quantity" />
+                            <span class="err" id="errReturnQty"></span>
                         </div>
-                        <div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
-                            ⚠️ Returned items will be added back to inventory with expiry date: <strong>${new Date(invDate.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]}</strong> (7 days from invoice date)
+                        <div class="field">
+                            <label class="field-label" for="returnExpiry">Expiry Date</label>
+                            <input class="input" id="returnExpiry" type="date" />
+                            <span class="err" id="errReturnExpiry"></span>
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="returnReason">Reason (Optional)</label>
+                            <input class="input" id="returnReason" placeholder="e.g. Damaged, Expired, Wrong item" />
                         </div>
                     `,
                     footer: `<button class="btn btn-outline" data-cancel type="button">Cancel</button>
-                             <button class="btn btn-success" data-process-return type="button">Process Return (₹${inv.total.toFixed(2)})</button>`,
+                             <button class="btn btn-success" data-save-return type="button">Save Return</button>`,
                     onMount(_b, foot) {
                         foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
-                        foot.querySelector("[data-process-return]").addEventListener("click", () => {
-                            const reason = document.getElementById("returnReasonInvoice").value.trim() ||
-                                "Customer return";
-                            const returnItems = [];
-                            let totalReturnQty = 0;
-                            let totalRefund = 0;
 
-                            inv.items.forEach((item, idx) => {
-                                const qtyInput = document.getElementById(`returnQty_${idx}`);
-                                if (qtyInput) {
-                                    const qty = parseInt(qtyInput.value);
-                                    if (qty > 0 && qty <= item.quantity) {
-                                        returnItems.push({
-                                            ...item,
-                                            returnQuantity: qty
-                                        });
-                                        totalReturnQty += qty;
-                                        totalRefund += (qty / item.quantity) * item.lineTotal;
-                                    }
-                                }
-                            });
+                        // Auto-fill expiry when medicine is selected
+                        const medSelect = document.getElementById("returnMed");
+                        const expiryInput = document.getElementById("returnExpiry");
+                        const qtyInput = document.getElementById("returnQty");
 
-                            if (returnItems.length === 0 || totalReturnQty === 0) {
-                                Toast.error("No items selected", "Please select at least one item to return.");
-                                return;
-                            }
-
-                            // Process each return
-                            returnItems.forEach(item => {
-                                const newExpiry = new Date(invDate);
-                                newExpiry.setDate(newExpiry.getDate() + 7);
-                                const expMonth = newExpiry.getMonth() + 1;
-                                const expYear = newExpiry.getFullYear();
-
-                                const existing = Inventory.all().find(m => m.batchId === item.batchId && m
-                                    .name === item.name);
-                                if (existing) {
-                                    Inventory.update(existing.id, {
-                                        stock: existing.stock + item.returnQuantity
-                                    });
-                                } else {
-                                    const newMed = {
-                                        id: generateUniqueId(),
-                                        batchId: item.batchId + '-RET',
-                                        name: item.name,
-                                        generic: item.generic || "—",
-                                        category: item.category || "General",
-                                        price: item.price,
-                                        stock: item.returnQuantity,
-                                        expiryMonth: expMonth,
-                                        expiryYear: expYear,
-                                        createdAt: new Date().toISOString()
-                                    };
-                                    Inventory.add(newMed);
-                                }
-
-                                // Record return
-                                const returnRecord = {
-                                    medicineName: item.name,
-                                    batchId: item.batchId,
-                                    medicineId: item.id,
-                                    quantity: item.returnQuantity,
-                                    expiryDate: `${String(expMonth).padStart(2,'0')}/${expYear}`,
-                                    reason: reason,
-                                    invoiceId: inv.id,
-                                    customer: inv.customer.name,
-                                    refundAmount: (item.returnQuantity / item.quantity) * item.lineTotal,
-                                    returnedFromInvoice: true
-                                };
-                                AppState.returns.unshift(returnRecord);
-                            });
-
-                            // Update the invoice - remove returned items
-                            const updatedItems = inv.items.map(item => {
-                                const returned = returnItems.find(r => r.id === item.id);
-                                if (returned) {
-                                    return {
-                                        ...item,
-                                        quantity: item.quantity - returned.returnQuantity,
-                                        lineTotal: (item.quantity - returned.returnQuantity) * item
-                                        .price
-                                    };
-                                }
-                                return item;
-                            }).filter(item => item.quantity > 0);
-
-                            if (updatedItems.length > 0) {
-                                const newSubtotal = updatedItems.reduce((s, it) => s + it.lineTotal, 0);
-                                const newTax = newSubtotal * (inv.gstRate / 100);
-                                const newTotal = newSubtotal + newTax - inv.discountAmount;
-                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
-                                if (idx !== -1) {
-                                    AppState.invoices[idx].items = updatedItems;
-                                    AppState.invoices[idx].subtotal = newSubtotal;
-                                    AppState.invoices[idx].taxAmount = newTax;
-                                    AppState.invoices[idx].total = newTotal;
+                        medSelect.addEventListener("change", function() {
+                            const medId = this.value;
+                            if (medId) {
+                                const med = Inventory.find(medId);
+                                if (med) {
+                                    // Set max quantity
+                                    qtyInput.max = med.stock;
+                                    qtyInput.placeholder = `Max ${med.stock} units`;
+                                    // Set expiry date 7 days from now as default
+                                    const date = new Date();
+                                    date.setDate(date.getDate() + 7);
+                                    expiryInput.value = date.toISOString().split('T')[0];
                                 }
                             } else {
-                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
-                                if (idx !== -1) {
-                                    AppState.invoices.splice(idx, 1);
-                                }
+                                qtyInput.max = '';
+                                qtyInput.placeholder = 'Enter quantity';
+                                expiryInput.value = '';
                             }
+                        });
 
-                            Inventory.save();
-                            InvoiceManager.save();
+                        foot.querySelector("[data-save-return]").addEventListener("click", () => {
+                            const medId = document.getElementById("returnMed").value;
+                            const qty = parseInt(document.getElementById("returnQty").value);
+                            const expiry = document.getElementById("returnExpiry").value;
+                            const reason = document.getElementById("returnReason").value.trim();
+                            let ok = true;
+                            UI.setError("returnMed", "");
+                            UI.setError("returnQty", "");
+                            UI.setError("returnExpiry", "");
+                            if (!medId) { UI.setError("returnMed",
+                                "Please select a medicine."); ok = false; }
+                            if (!qty || qty < 1) { UI.setError("returnQty",
+                                "Enter a valid quantity."); ok = false; }
+                            if (!expiry) { UI.setError("returnExpiry",
+                                "Please select expiry date."); ok = false; }
+                            if (!ok) { Toast.error("Validation failed"); return; }
+                            const med = Inventory.find(medId);
+                            if (!med) { Toast.error("Medicine not found"); return; }
+                            if (qty > med.stock) {
+                                Toast.error("Invalid quantity",
+                                    `Only ${med.stock} units available.`);
+                                return;
+                            }
+                            // Check if expiry is at least 7 days from now
+                            const expDate = new Date(expiry);
+                            const now = new Date();
+                            const daysDiff = (expDate - now) / (1000 * 60 * 60 * 24);
+                            if (daysDiff < 7) {
+                                Toast.error("Invalid Expiry",
+                                    "Returned medicine must have at least 7 days expiry remaining.");
+                                return;
+                            }
+                            const returnItem = {
+                                medicineName: med.name,
+                                batchId: med.batchId,
+                                medicineId: med.id,
+                                quantity: qty,
+                                expiryDate: expiry,
+                                reason: reason || "No reason provided"
+                            };
+                            AppState.returns.unshift(returnItem);
+                            Storage.save(CONFIG.KEYS.RETURNS, AppState.returns);
                             Modal.close();
                             UI.refreshAll();
-                            Toast.success("Return Processed",
-                                `${totalReturnQty} units returned. Refund amount: ₹${totalRefund.toFixed(2)}`);
+                            Toast.success("Return recorded",
+                                `${med.name} - ${qty} units returned.`);
                         });
                     }
                 });
@@ -2130,13 +2076,27 @@
                     UI.renderInvoices();
                 });
 
-                // Return from invoice button
+                // Return from invoice button - show return modal
                 document.getElementById("invoiceBody")?.addEventListener("click", (e) => {
                     const returnBtn = e.target.closest("[data-return-invoice]");
                     if (returnBtn) {
-                        UI.returnFromInvoice(returnBtn.dataset.returnInvoice);
+                        UI.openReturnModal();
                     }
                 });
+
+                // Add Return button in sidebar - open return modal
+                // We need to add a return button in the sidebar or use the existing one
+                // Since we removed Returns section, we'll use the invoice return button
+                // Also add a global return button in the header or somewhere accessible
+                // We'll add a return button in the invoice section header
+                const invoiceHead = document.querySelector('#view-invoices .page-head');
+                if (invoiceHead) {
+                    const returnBtn = document.createElement('button');
+                    returnBtn.className = 'btn btn-danger btn-sm';
+                    returnBtn.innerHTML = '↩️ Return Medicine';
+                    returnBtn.addEventListener('click', UI.openReturnModal);
+                    invoiceHead.appendChild(returnBtn);
+                }
             }
 
             static bindPOS() {
@@ -2305,19 +2265,45 @@
                     chat.appendChild(thinkingMsg);
                     chat.scrollTop = chat.scrollHeight;
 
-                    // Simulate AI response with local knowledge
                     setTimeout(() => {
                         thinkingMsg.remove();
                         let response = getAIResponse(text);
                         const botMsg = document.createElement("div");
                         botMsg.className = "ai-msg bot";
+
+                        // Add medicine buttons if response contains medicine names
                         let formatted = response;
+                        const medNames = Inventory.all().map(m => m.name);
+                        medNames.forEach(med => {
+                            if (formatted.includes(med)) {
+                                const medObj = Inventory.all().find(m => m.name === med);
+                                if (medObj && medObj.stock > 0) {
+                                    const btnHtml =
+                                        `<button class="med-btn" data-add="${medObj.id}">➕ Add ${med} to Cart</button>`;
+                                    formatted = formatted.replace(med, `${med} ${btnHtml}`);
+                                }
+                            }
+                        });
+
                         formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                         formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
                         formatted = formatted.replace(/\n/g, '<br>');
                         botMsg.innerHTML = formatted;
                         chat.appendChild(botMsg);
                         chat.scrollTop = chat.scrollHeight;
+
+                        // Add event listeners for medicine buttons
+                        botMsg.querySelectorAll('.med-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                const id = this.dataset.add;
+                                if (id) {
+                                    Billing.add(id);
+                                    Toast.success('Added to cart', this.textContent.replace('➕ Add ', '')
+                                        .replace(' to Cart', ''));
+                                }
+                            });
+                        });
+
                         isProcessing = false;
                         askBtn.disabled = false;
                         askBtn.textContent = "Ask";
@@ -2328,36 +2314,36 @@
                 function getAIResponse(text) {
                     const q = text.toLowerCase();
                     if (q.includes("fever") || q.includes("bukhar") || q.includes("बुखार")) {
-                        return "Fever is an elevated body temperature. It's usually a sign of infection. Treatment: Rest, hydration, paracetamol (Dolo 650mg, Calpol 500mg). If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
+                        return "Fever is an elevated body temperature. It's usually a sign of infection. Treatment: Rest, hydration, **paracetamol (Dolo 650mg, Calpol 500mg)**. If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
                     }
                     if (q.includes("headache") || q.includes("sir dard") || q.includes("सिरदर्द")) {
-                        return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, paracetamol or ibuprofen. For migraines, consult a doctor. Available medicines: Dolo 650mg, Combiflam, Crocin Advance.";
+                        return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, **paracetamol or ibuprofen**. For migraines, consult a doctor. Available medicines: **Dolo 650mg, Combiflam, Crocin Advance**.";
                     }
                     if (q.includes("cold") || q.includes("jukam") || q.includes("जुकाम")) {
-                        return "Common cold is a viral infection. Treatment: Rest, fluids, antihistamines (Alerid 10mg, Montair-LC). Steam inhalation helps. Usually resolves in 7-10 days.";
+                        return "Common cold is a viral infection. Treatment: Rest, fluids, **antihistamines (Alerid 10mg, Montair-LC)**. Steam inhalation helps. Usually resolves in 7-10 days.";
                     }
                     if (q.includes("toothache") || q.includes("dath") || q.includes("दांत")) {
-                        return "Toothache can be caused by cavity, infection, or gum disease. Treatment: Pain relievers (Dolo 650mg, Combiflam), clove oil, salt water rinse. See a dentist immediately for proper treatment.";
+                        return "Toothache can be caused by cavity, infection, or gum disease. Treatment: **Pain relievers (Dolo 650mg, Combiflam)** , clove oil, salt water rinse. See a dentist immediately for proper treatment.";
                     }
                     if (q.includes("acidity") || q.includes("esiditi") || q.includes("एसिडिटी")) {
-                        return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg). Avoid spicy foods, eat small meals.";
+                        return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, **Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg)** . Avoid spicy foods, eat small meals.";
                     }
                     if (q.includes("diabetes") || q.includes("डायबिटीज")) {
-                        return "Diabetes is a chronic condition with high blood sugar. Treatment: Metformin (Glycomet 500), Glimepiride (Glimisave M2), diet control, regular exercise. Consult a doctor for proper management.";
+                        return "Diabetes is a chronic condition with high blood sugar. Treatment: **Metformin (Glycomet 500), Glimepiride (Glimisave M2)** , diet control, regular exercise. Consult a doctor for proper management.";
                     }
                     if (q.includes("infection")) {
-                        return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg. Always complete the full course. Consult a doctor.";
+                        return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like **Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg** . Always complete the full course. Consult a doctor.";
                     }
                     if (q.includes("pain") || q.includes("dard") || q.includes("दर्द")) {
-                        return "Pain relief options: Dolo 650mg (paracetamol) for mild pain, Combiflam for moderate pain, Voveran SR 100 for severe pain. Always consult a doctor for chronic pain.";
+                        return "Pain relief options: **Dolo 650mg** (paracetamol) for mild pain, **Combiflam** for moderate pain, **Voveran SR 100** for severe pain. Always consult a doctor for chronic pain.";
                     }
                     if (q.includes("math") || q.includes("calculate") || q.includes("solve")) {
-                        return "I can help with math! Please specify your calculation clearly. For example: 'What is 25 × 14?' = 350";
+                        return "I can help with math! Please specify your calculation clearly. For example: 'What is 25 × 14?' = **350**";
                     }
                     if (q.includes("how are you")) {
                         return "I'm doing great! I'm an AI health assistant here to help you with any health-related questions. How can I assist you today?";
                     }
-                    return "I'm your AI Health Assistant. Please ask about: fever, headache, cold, toothache, acidity, diabetes, infection, pain relief, or any medicine name. I'm here to help!";
+                    return "I'm your AI Health Assistant. Please ask about: **fever, headache, cold, toothache, acidity, diabetes, infection, pain relief**, or any medicine name. I'm here to help!";
                 }
 
                 askBtn.addEventListener("click", () => {
