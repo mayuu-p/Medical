@@ -769,7 +769,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: Return auto-populates from invoice, WhatsApp & Details working
+        //  FIXED: Invoice Details modal with WhatsApp button working
         // =========================================================================
 
         // ---------- CONFIG ----------
@@ -1143,7 +1143,7 @@
                     items,
                     "---------------------------------",
                     `*Subtotal:* ₹${inv.subtotal.toFixed(2)}`,
-                    `*Taxes:* ₹${inv.taxAmount.toFixed(2)}`,
+                    `*Taxes (CGST+SGST):* ₹${inv.taxAmount.toFixed(2)}`,
                     `*Discount applied:* ₹${inv.discountAmount.toFixed(2)}`,
                     `*NET PAYABLE:* *₹${inv.total.toFixed(2)}*`,
                     "---------------------------------",
@@ -1719,12 +1719,90 @@
                         } });
             }
 
-            // ---------- RETURN FROM INVOICE (AUTO-POPULATED) ----------
+            // ---------- SHOW INVOICE DETAILS WITH WORKING WHATSAPP ----------
+            static showInvoice(id, isNew = false) {
+                const inv = InvoiceManager.find(id);
+                if (!inv) {
+                    Toast.error("Invoice not found");
+                    return;
+                }
+
+                // Build items rows
+                const rows = inv.items.map(it =>
+                    `<tr>
+                        <td><span class="cell-strong">${Utils.esc(it.name)}</span><small class="cell-sub">${Utils.esc(it.batchId)}</small></td>
+                        <td>${Utils.inr(it.price)}</td>
+                        <td>${it.quantity}</td>
+                        <td class="cell-strong">${Utils.inr(it.lineTotal)}</td>
+                    </tr>`
+                ).join('');
+
+                const storeName = AppState.storeName || "MEDICAL STORE";
+
+                Modal.open({
+                    title: "Invoice Details",
+                    subtitle: `${inv.id} · ${Utils.formatDateTime(inv.timestamp)}`,
+                    body: `
+                        <div class="card" style="box-shadow:none;margin-bottom:14px;border:1px solid #e2e8f0;">
+                            <div class="card-pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                                <div>
+                                    <small style="font-size:10.5px;color:var(--slate-500);font-weight:800;text-transform:uppercase;">Customer</small>
+                                    <b style="display:block;font-size:14px;">${Utils.esc(inv.customer.name)}</b>
+                                    <small style="color:var(--slate-500);font-weight:600;">+91 ${Utils.esc(inv.customer.mobile)}</small>
+                                </div>
+                                <div style="text-align:right;">
+                                    <small style="font-size:10.5px;color:var(--slate-500);font-weight:800;text-transform:uppercase;">Billed By</small>
+                                    <b style="display:block;font-size:14px;">${Utils.esc(inv.billedBy || "—")}</b>
+                                    <small style="color:var(--slate-500);font-weight:600;">${Utils.esc(storeName)}</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data" style="min-width:420px;">
+                                <thead>
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Rate</th>
+                                        <th>Qty</th>
+                                        <th>Line Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:14px;">
+                            <div class="sum-row"><span>Subtotal</span><b>${Utils.inr(inv.subtotal)}</b></div>
+                            <div class="sum-row"><span>Discount (${inv.discountPercent}%)</span><b style="color:var(--danger);">− ${Utils.inr(inv.discountAmount)}</b></div>
+                            <div class="sum-row"><span>CGST (${inv.gstRate/2}%)</span><b>${Utils.inr(inv.cgst)}</b></div>
+                            <div class="sum-row"><span>SGST (${inv.gstRate/2}%)</span><b>${Utils.inr(inv.sgst)}</b></div>
+                            <div class="sum-row"><span>Total Tax</span><b>${Utils.inr(inv.taxAmount)}</b></div>
+                            <div class="net" style="margin-top:8px;">
+                                <div><small>Net Paid</small><b>${Utils.inr(inv.total)}</b></div>
+                                <span style="font-size:22px;">₹</span>
+                            </div>
+                        </div>
+                    `,
+                    footer: `
+                        <button class="btn btn-outline" data-cancel type="button">Close</button>
+                        <button class="btn btn-success" data-wa-modal type="button">📲 Send WhatsApp</button>
+                    `,
+                    onMount(_body, foot) {
+                        // Close button
+                        foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
+
+                        // WhatsApp button - works perfectly
+                        foot.querySelector("[data-wa-modal]").addEventListener("click", function() {
+                            InvoiceManager.sendWA(inv.id);
+                        });
+                    }
+                });
+            }
+
+            // ---------- RETURN FROM INVOICE ----------
             static returnFromInvoice(invoiceId) {
                 const inv = InvoiceManager.find(invoiceId);
                 if (!inv) { Toast.error("Invoice not found"); return; }
 
-                // Check if invoice is older than 7 days
                 const invDate = new Date(inv.timestamp);
                 const now = new Date();
                 const daysDiff = (now - invDate) / (1000 * 60 * 60 * 24);
@@ -1734,11 +1812,8 @@
                     return;
                 }
 
-                // Create return modal with auto-populated invoice data
                 const itemsHtml = inv.items.map((item, idx) => {
-                    // Check if this medicine exists in inventory
                     const existingMed = Inventory.all().find(m => m.name === item.name && m.batchId === item.batchId);
-                    const maxQty = existingMed ? existingMed.stock + item.quantity : item.quantity;
                     const expiryDate = existingMed ?
                         `${String(existingMed.expiryMonth).padStart(2,'0')}/${existingMed.expiryYear}` :
                         'N/A';
@@ -1757,31 +1832,23 @@
                     </div>`;
                 }).join('');
 
-                const totalRefund = inv.total;
-
                 Modal.open({
                     title: "↩️ Return Items from Invoice",
                     subtitle: `${inv.id} - ${inv.customer.name}`,
                     body: `
                         <div style="margin-bottom:12px;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:13px;color:#166534;">
-                            💰 Total Refund Amount: <strong>₹${totalRefund.toFixed(2)}</strong>
-                        </div>
-                        <div style="margin-bottom:12px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
-                            📦 Items will be added back to inventory with 7-day expiry from invoice date
+                            💰 Total Refund Amount: <strong>₹${inv.total.toFixed(2)}</strong>
                         </div>
                         <div style="max-height:300px;overflow-y:auto;">
                             ${itemsHtml}
                         </div>
                         <div class="field" style="margin-top:12px;">
                             <label class="field-label" for="returnReasonInvoice">Reason for Return</label>
-                            <input class="input" id="returnReasonInvoice" placeholder="e.g. Expired, Damaged, Wrong item, Customer request" value="Customer return" />
-                        </div>
-                        <div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
-                            ⚠️ Returned items will be added to inventory with expiry: <strong>${new Date(invDate.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]}</strong>
+                            <input class="input" id="returnReasonInvoice" placeholder="e.g. Expired, Damaged, Wrong item" value="Customer return" />
                         </div>
                     `,
                     footer: `<button class="btn btn-outline" data-cancel type="button">Cancel</button>
-                             <button class="btn btn-success" data-process-return type="button">Process Return (₹${totalRefund.toFixed(2)})</button>`,
+                             <button class="btn btn-success" data-process-return type="button">Process Return</button>`,
                     onMount(_b, foot) {
                         foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
                         foot.querySelector("[data-process-return]").addEventListener("click", () => {
@@ -1789,7 +1856,6 @@
                                 "Customer return";
                             const returnItems = [];
                             let totalReturnQty = 0;
-                            let totalRefundAmount = 0;
 
                             inv.items.forEach((item, idx) => {
                                 const qtyInput = document.getElementById(`returnQty_${idx}`);
@@ -1801,7 +1867,6 @@
                                             returnQuantity: qty
                                         });
                                         totalReturnQty += qty;
-                                        totalRefundAmount += (qty / item.quantity) * item.lineTotal;
                                     }
                                 }
                             });
@@ -1811,14 +1876,12 @@
                                 return;
                             }
 
-                            // Process each return
                             returnItems.forEach(item => {
                                 const newExpiry = new Date(invDate);
                                 newExpiry.setDate(newExpiry.getDate() + 7);
                                 const expMonth = newExpiry.getMonth() + 1;
                                 const expYear = newExpiry.getFullYear();
 
-                                // Check if medicine exists in inventory
                                 const existing = Inventory.all().find(m => m.name === item.name && m.batchId ===
                                     item.batchId);
                                 if (existing) {
@@ -1841,7 +1904,6 @@
                                     Inventory.add(newMed);
                                 }
 
-                                // Record return
                                 const returnRecord = {
                                     medicineName: item.name,
                                     batchId: item.batchId,
@@ -1857,7 +1919,6 @@
                                 AppState.returns.unshift(returnRecord);
                             });
 
-                            // Update the invoice - remove returned items
                             const updatedItems = inv.items.map(item => {
                                 const returned = returnItems.find(r => r.id === item.id);
                                 if (returned) {
@@ -1893,28 +1954,10 @@
                             InvoiceManager.save();
                             Modal.close();
                             UI.refreshAll();
-                            Toast.success("Return Processed",
-                                `${totalReturnQty} units returned. Refund amount: ₹${totalRefundAmount.toFixed(2)}`);
+                            Toast.success("Return Processed", `${totalReturnQty} units returned.`);
                         });
                     }
                 });
-            }
-
-            static showInvoice(id, isNew = false) {
-                const inv = InvoiceManager.find(id);
-                if (!inv) return;
-                const rows = inv.items.map(it =>
-                    `<tr><td><span class="cell-strong">${Utils.esc(it.name)}</span><small class="cell-sub">${Utils.esc(it.batchId)}</small></td><td>${Utils.inr(it.price)}</td><td>${it.quantity}</td><td class="cell-strong">${Utils.inr(it.lineTotal)}</td></tr>`
-                    ).join("");
-                Modal.open({ title: isNew ? "Invoice Generated" : "Invoice Details",
-                    subtitle: `${inv.id} · ${Utils.formatDateTime(inv.timestamp)}`,
-                    body: `<div class="card" style="box-shadow:none;margin-bottom:14px"><div class="card-pad" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><small style="font-size:10.5px;color:var(--slate-500);font-weight:800;text-transform:uppercase">Customer</small><b style="display:block;font-size:14px">${Utils.esc(inv.customer.name)}</b><small style="color:var(--slate-500);font-weight:600">+91 ${Utils.esc(inv.customer.mobile)}</small></div><div style="text-align:right"><small style="font-size:10.5px;color:var(--slate-500);font-weight:800;text-transform:uppercase">Billed By</small><b style="display:block;font-size:14px">${Utils.esc(inv.billedBy || "—")}</b><small style="color:var(--slate-500);font-weight:600">${Utils.esc(AppState.storeName || "MEDICAL STORE")}</small></div></div></div><div class="table-scroll"><table class="data" style="min-width:420px"><thead><tr><th>Medicine</th><th>Rate</th><th>Qty</th><th>Line Total</th></tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:14px"><div class="sum-row"><span>Subtotal</span><b>${Utils.inr(inv.subtotal)}</b></div><div class="sum-row"><span>Discount (${inv.discountPercent}%)</span><b style="color:var(--danger)">− ${Utils.inr(inv.discountAmount)}</b></div><div class="sum-row"><span>CGST (${inv.gstRate/2}%)</span><b>${Utils.inr(inv.cgst)}</b></div><div class="sum-row"><span>SGST (${inv.gstRate/2}%)</span><b>${Utils.inr(inv.sgst)}</b></div><div class="sum-row"><span>Total Tax</span><b>${Utils.inr(inv.taxAmount)}</b></div><div class="net"><div><small>Net Paid</small><b>${Utils.inr(inv.total)}</b></div><span style="font-size:22px">₹</span></div></div>`,
-                    footer: `<button class="btn btn-outline" data-cancel type="button">Close</button><button class="btn btn-success" data-wa-modal type="button">📲 Send WhatsApp</button>`,
-                    onMount(_b, foot) {
-                        foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
-                        foot.querySelector("[data-wa-modal]").addEventListener("click", () => InvoiceManager
-                            .sendWA(inv.id));
-                    } });
             }
 
             static showAuth() { document.getElementById("authScreen").style.display = "flex";
@@ -2127,7 +2170,6 @@
                     if (del) UI.removeExpired(del.dataset.deleteExpired);
                 });
 
-                // Auto-format month/year search
                 const monthSearch = document.getElementById("invoiceMonthSearch");
                 if (monthSearch) {
                     monthSearch.addEventListener("input", function(e) {
@@ -2149,12 +2191,12 @@
                     UI.renderInvoices();
                 });
 
-                // Return from invoice button
                 document.getElementById("invoiceBody")?.addEventListener("click", (e) => {
                     const returnBtn = e.target.closest("[data-return-invoice]");
                     if (returnBtn) {
                         UI.returnFromInvoice(returnBtn.dataset.returnInvoice);
                     }
+                    // Details and WhatsApp are handled via data-view-invoice and data-wa in renderInvoices
                 });
             }
 
@@ -2330,7 +2372,6 @@
                         const botMsg = document.createElement("div");
                         botMsg.className = "ai-msg bot";
 
-                        // Add medicine buttons for each medicine mentioned
                         let formatted = response;
                         const medNames = Inventory.all().map(m => m.name);
                         medNames.forEach(med => {
@@ -2351,7 +2392,6 @@
                         chat.appendChild(botMsg);
                         chat.scrollTop = chat.scrollHeight;
 
-                        // Add event listeners for medicine buttons
                         botMsg.querySelectorAll('.med-btn').forEach(btn => {
                             btn.addEventListener('click', function() {
                                 const id = this.dataset.add;
@@ -2373,28 +2413,28 @@
                 function getAIResponse(text) {
                     const q = text.toLowerCase();
                     if (q.includes("fever") || q.includes("bukhar") || q.includes("बुखार")) {
-                        return "Fever is an elevated body temperature. It's usually a sign of infection. Treatment: Rest, hydration, **paracetamol (Dolo 650mg, Calpol 500mg)**. If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
+                        return "Fever is an elevated body temperature. Treatment: Rest, hydration, **paracetamol (Dolo 650mg, Calpol 500mg)**. If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
                     }
                     if (q.includes("headache") || q.includes("sir dard") || q.includes("सिरदर्द")) {
-                        return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, **paracetamol or ibuprofen**. For migraines, consult a doctor. Available medicines: **Dolo 650mg, Combiflam, Crocin Advance**.";
+                        return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, **paracetamol or ibuprofen**. Available medicines: **Dolo 650mg, Combiflam, Crocin Advance**.";
                     }
                     if (q.includes("cold") || q.includes("jukam") || q.includes("जुकाम")) {
                         return "Common cold is a viral infection. Treatment: Rest, fluids, **antihistamines (Alerid 10mg, Montair-LC)**. Steam inhalation helps. Usually resolves in 7-10 days.";
                     }
                     if (q.includes("toothache") || q.includes("dath") || q.includes("दांत")) {
-                        return "Toothache can be caused by cavity, infection, or gum disease. Treatment: **Pain relievers (Dolo 650mg, Combiflam)** , clove oil, salt water rinse. See a dentist immediately for proper treatment.";
+                        return "Toothache can be caused by cavity, infection, or gum disease. Treatment: **Pain relievers (Dolo 650mg, Combiflam)** , clove oil, salt water rinse. See a dentist immediately.";
                     }
                     if (q.includes("acidity") || q.includes("esiditi") || q.includes("एसिडिटी")) {
-                        return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, **Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg)** . Avoid spicy foods, eat small meals.";
+                        return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, **Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg)** . Avoid spicy foods.";
                     }
                     if (q.includes("diabetes") || q.includes("डायबिटीज")) {
-                        return "Diabetes is a chronic condition with high blood sugar. Treatment: **Metformin (Glycomet 500), Glimepiride (Glimisave M2)** , diet control, regular exercise. Consult a doctor for proper management.";
+                        return "Diabetes is a chronic condition with high blood sugar. Treatment: **Metformin (Glycomet 500), Glimepiride (Glimisave M2)** , diet control, regular exercise.";
                     }
                     if (q.includes("infection")) {
-                        return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like **Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg** . Always complete the full course. Consult a doctor.";
+                        return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like **Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg**. Consult a doctor.";
                     }
                     if (q.includes("pain") || q.includes("dard") || q.includes("दर्द")) {
-                        return "Pain relief options: **Dolo 650mg** (paracetamol) for mild pain, **Combiflam** for moderate pain, **Voveran SR 100** for severe pain. Always consult a doctor for chronic pain.";
+                        return "Pain relief options: **Dolo 650mg** (mild pain), **Combiflam** (moderate pain), **Voveran SR 100** (severe pain).";
                     }
                     if (q.includes("math") || q.includes("calculate") || q.includes("solve")) {
                         return "I can help with math! Please specify your calculation clearly. For example: 'What is 25 × 14?' = **350**";
@@ -2402,7 +2442,7 @@
                     if (q.includes("how are you")) {
                         return "I'm doing great! I'm an AI health assistant here to help you with any health-related questions. How can I assist you today?";
                     }
-                    return "I'm your AI Health Assistant. Please ask about: **fever, headache, cold, toothache, acidity, diabetes, infection, pain relief**, or any medicine name. I'm here to help!";
+                    return "I'm your AI Health Assistant. Please ask about: **fever, headache, cold, toothache, acidity, diabetes, infection, pain relief**, or any medicine name.";
                 }
 
                 askBtn.addEventListener("click", () => {
@@ -2414,7 +2454,7 @@
 
                 clearBtn.addEventListener("click", () => {
                     chat.innerHTML =
-                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
+                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...</div>`;
                     query.value = "";
                     Toast.info("Chat cleared", "Conversation history has been cleared.");
                 });
@@ -2445,7 +2485,7 @@
                             toothache: "Mere dath me dard hai, kya kare?",
                             pain: "What is the best pain relief medicine?",
                             math: "Solve 25 × 14 step by step",
-                            greeting: "How are you doing today? I need some health advice."
+                            greeting: "How are you doing today?"
                         };
                         query.value = map[val] || val;
                         const q = query.value.trim();
