@@ -198,6 +198,10 @@
             background: #ede9fe;
             color: #6d28d9;
         }
+        .badge-expired {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
 
         .card {
             background: var(--card);
@@ -541,6 +545,7 @@
             font-size: 17px
         }
 
+        /* SIDEBAR — FIXED POSITION */
         aside.sidebar {
             position: fixed;
             top: var(--header-h);
@@ -555,6 +560,7 @@
             flex-direction: column;
             transition: transform .25s ease;
             overflow-y: auto;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
         }
         .sidebar::-webkit-scrollbar-thumb {
             background: #334155;
@@ -719,6 +725,9 @@
         .kpi.k-purple::after {
             background: #7c3aed;
         }
+        .kpi.k-expired::after {
+            background: #7f1d1d;
+        }
         .kpi .kpi-top {
             display: flex;
             align-items: center;
@@ -749,6 +758,10 @@
         .kpi.k-purple .kpi-ico {
             background: #ede9fe;
             color: #6d28d9;
+        }
+        .kpi.k-expired .kpi-ico {
+            background: #7f1d1d;
+            color: #fca5a5;
         }
         .kpi h4 {
             font-size: 11.5px;
@@ -880,6 +893,18 @@
         }
         table.data tr.expiring:hover {
             background: #fde68a;
+        }
+        table.data tr.expired {
+            background: #7f1d1d;
+        }
+        table.data tr.expired:hover {
+            background: #991b1b;
+        }
+        table.data tr.expired td {
+            color: #fca5a5;
+        }
+        table.data tr.expired .badge {
+            border-color: #fca5a5;
         }
         .mono {
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1288,62 +1313,6 @@
                 opacity: 1;
             }
         }
-        .ai-msg .ai-code {
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            display: block;
-            margin: 6px 0;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        .ai-msg .ai-list {
-            padding-left: 18px;
-            margin: 4px 0;
-        }
-        .ai-msg .ai-list li {
-            margin: 2px 0;
-        }
-        .ai-msg .ai-table {
-            border-collapse: collapse;
-            font-size: 12px;
-            width: 100%;
-            margin: 6px 0;
-        }
-        .ai-msg .ai-table th,
-        .ai-msg .ai-table td {
-            border: 1px solid #e2e8f0;
-            padding: 4px 8px;
-            text-align: left;
-        }
-        .ai-msg .ai-table th {
-            background: #f1f5f9;
-            font-weight: 700;
-        }
-
-        /* Expiry Alert Badge */
-        .expiry-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 30px;
-            font-size: 10px;
-            font-weight: 700;
-        }
-        .expiry-badge.soon {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .expiry-badge.urgent {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        .expiry-badge.ok {
-            background: #dcfce7;
-            color: #166534;
-        }
 
         /* Responsive */
         @media (max-width:1180px) {
@@ -1531,6 +1500,7 @@
                 <button class="nav-item" data-view="inventory" type="button"><span class="ico">💊</span> All Medicines Hub</button>
                 <button class="nav-item" data-view="lowstock" type="button"><span class="ico">⚠️</span> Low Stock Alerts <span class="pill hidden" id="navLowPill">0</span></button>
                 <button class="nav-item" data-view="expiry" type="button"><span class="ico">📅</span> Expiry Alerts <span class="pill hidden" id="navExpiryPill">0</span></button>
+                <button class="nav-item" data-view="expired" type="button"><span class="ico">🚫</span> Expired Medicines <span class="pill hidden" id="navExpiredPill">0</span></button>
                 <button class="nav-item" data-view="invoices" type="button"><span class="ico">🗂️</span> Historical Bill Repository</button>
                 <button class="nav-item" data-view="settings" type="button"><span class="ico">⚙️</span> Settings</button>
                 <button class="nav-item" data-view="aiassistant" type="button" id="aiNavBtn"><span class="ico">🤖</span> AI Health Assistant</button>
@@ -1557,7 +1527,7 @@
                     <article class="kpi"><div class="kpi-top"><div class="kpi-ico">₹</div><span class="badge badge-blue">LIVE</span></div><h4>Total Inventory Valuation</h4><div class="val" id="kpiValuation">₹0</div><div class="sub" id="kpiValuationSub">Retail price × stock units</div></article>
                     <article class="kpi k-green"><div class="kpi-top"><div class="kpi-ico">📈</div><span class="badge badge-green">TODAY</span></div><h4>Today's Gross Revenue</h4><div class="val" id="kpiRevenue">₹0</div><div class="sub" id="kpiRevenueSub">0 invoices billed today</div></article>
                     <article class="kpi k-slate"><div class="kpi-top"><div class="kpi-ico">💊</div><span class="badge badge-slate">INDEX</span></div><h4>Registered Medicine Index</h4><div class="val" id="kpiMedicines">0</div><div class="sub" id="kpiMedicinesSub">0 stock units held</div></article>
-                    <article class="kpi k-purple"><div class="kpi-top"><div class="kpi-ico">📅</div><span class="badge badge-purple">EXPIRY</span></div><h4>Expiring Soon (30 days)</h4><div class="val" id="kpiExpiry">0</div><div class="sub" id="kpiExpirySub">Medicines expiring soon</div></article>
+                    <article class="kpi k-expired"><div class="kpi-top"><div class="kpi-ico">🚫</div><span class="badge badge-expired">EXPIRED</span></div><h4>Expired Medicines</h4><div class="val" id="kpiExpired">0</div><div class="sub" id="kpiExpiredSub">Total expired stock</div></article>
                 </div>
                 <div class="two-col">
                     <div class="card">
@@ -1583,6 +1553,10 @@
                 <div class="card" style="margin-top:16px">
                     <div class="card-head"><div><div class="card-title">Recent Expiry Alerts</div><div class="card-sub">Medicines expiring in next 30 days</div></div><button class="btn btn-outline btn-sm" data-goto="expiry" type="button">View all expiry alerts</button></div>
                     <div id="dashExpiry"></div>
+                </div>
+                <div class="card" style="margin-top:16px">
+                    <div class="card-head"><div><div class="card-title">Expired Medicines</div><div class="card-sub">Medicines that have passed expiry date</div></div><button class="btn btn-outline btn-sm" data-goto="expired" type="button">View all expired</button></div>
+                    <div id="dashExpired"></div>
                 </div>
             </section>
 
@@ -1705,6 +1679,26 @@
                 </div>
             </section>
 
+            <!-- EXPIRED MEDICINES -->
+            <section class="view" id="view-expired">
+                <div class="page-head"><div><h2>🚫 Expired Medicines</h2><p>All medicines that have passed their expiry date. These should be disposed of properly.</p></div>
+                    <button class="btn btn-danger" id="clearExpiredBtn">🗑 Remove All Expired</button>
+                </div>
+                <div class="card">
+                    <div class="card-head">
+                        <div class="search-wrap"><span class="ico">🔍</span><input class="input" id="expiredSearch" placeholder="Search expired medicines…" autocomplete="off" aria-label="Search expired" /></div>
+                        <span class="badge badge-expired" id="expiredCountBadge">0 expired</span>
+                    </div>
+                    <div class="table-scroll" style="max-height:62vh;overflow-y:auto">
+                        <table class="data" style="min-width:760px">
+                            <thead><tr><th>Medicine Name</th><th>Batch ID</th><th>Category</th><th>Expiry Date</th><th>Days Overdue</th><th>Stock</th><th>Action</th></tr></thead>
+                            <tbody id="expiredBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-foot"><span id="expiredFootLeft">—</span><span id="expiredFootRight">—</span></div>
+                </div>
+            </section>
+
             <!-- INVOICES -->
             <section class="view" id="view-invoices">
                 <div class="page-head"><div><h2>Historical Bill Repository</h2><p>Permanent archive of every dispatched invoice.</p></div></div>
@@ -1787,7 +1781,7 @@
                         <div class="field">
                             <label class="field-label" for="aiQuery">Ask me anything about health, medicines, diseases, symptoms, or general medical advice:</label>
                             <div style="display:flex;gap:8px">
-                                <input class="input" id="aiQuery" placeholder="e.g. What is the treatment for typhoid? / How to reduce fever? / बुखार कम करने के उपाय?" style="flex:1" />
+                                <input class="input" id="aiQuery" placeholder="e.g. Mere dath me dard hai / What is the treatment for typhoid? / बुखार कम करने के उपाय?" style="flex:1" />
                                 <button class="btn" id="aiAskBtn">Ask</button>
                                 <button class="btn btn-outline" id="aiClearBtn">Clear</button>
                             </div>
@@ -1805,9 +1799,12 @@
                             <button class="btn btn-sm btn-outline" data-ai-quick="blood pressure">❤️ BP</button>
                             <button class="btn btn-sm btn-outline" data-ai-quick="toothache">🦷 Toothache</button>
                             <button class="btn btn-sm btn-outline" data-ai-quick="nail">💅 Nail issues</button>
+                            <button class="btn btn-sm btn-outline" data-ai-quick="pain">💊 Pain Relief</button>
+                            <button class="btn btn-sm btn-outline" data-ai-quick="skin">🧴 Skin</button>
+                            <button class="btn btn-sm btn-outline" data-ai-quick="diarrhea">💩 Diarrhea</button>
                         </div>
                         <div class="ai-chat" id="aiChat">
-                            <div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by a comprehensive medical knowledge base.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• Drug interactions and side effects<br>• First aid guidance<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>
+                            <div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant. I can understand English, Hindi, and Hinglish.<br><br>💡 <strong>You can ask me like:</strong><br>• "Mere dath me dard hai"<br>• "What is the treatment for typhoid?"<br>• "बुखार कम करने के उपाय?"<br><br>I'll give you detailed answers with medicine suggestions!</div>
                         </div>
                     </div>
                 </div>
@@ -1832,7 +1829,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: Sticky header, fixed UI elements, expiry alerts, powerful AI
+        //  FIXED: Sticky header, sidebar fixed, conversational AI, expired medicines
         //  0.5s toasts, no text selection, no zoom
         // =========================================================================
 
@@ -1901,12 +1898,21 @@
                 const days = Utils.daysUntilExpiry(month, year);
                 return days <= CONFIG.EXPIRY.SOON && days >= 0;
             }
+            static isExpired(month, year) {
+                const days = Utils.daysUntilExpiry(month, year);
+                return days < 0;
+            }
             static getExpiryStatus(month, year) {
                 const days = Utils.daysUntilExpiry(month, year);
-                if (days < 0) return { label: "EXPIRED", cls: "badge-red", row: "crit" };
+                if (days < 0) return { label: "EXPIRED", cls: "badge-expired", row: "expired" };
                 if (days <= CONFIG.EXPIRY.URGENT) return { label: "URGENT", cls: "badge-red", row: "crit" };
                 if (days <= CONFIG.EXPIRY.SOON) return { label: "SOON", cls: "badge-orange", row: "expiring" };
                 return { label: "OK", cls: "badge-green", row: "" };
+            }
+            static getExpiredStatus(month, year) {
+                const days = Utils.daysUntilExpiry(month, year);
+                if (days < 0) return { label: "EXPIRED", cls: "badge-expired", row: "expired", days: Math.abs(days) };
+                return null;
             }
         }
 
@@ -1924,7 +1930,14 @@
         function genExpiry() {
             const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
             const month = Utils.pick(months);
-            const year = Utils.pick([2026, 2027, 2028, 2029, 2030]);
+            // Make some medicines already expired for demo
+            const yearRoll = Math.random();
+            let year;
+            if (yearRoll < 0.08) {
+                year = Utils.pick([2024, 2025]); // Already expired
+            } else {
+                year = Utils.pick([2026, 2027, 2028, 2029, 2030]);
+            }
             return { month, year };
         }
 
@@ -2007,9 +2020,22 @@
             { name: "ORS Powder Sachet", generic: "Oral Rehydration Salts", category: "First Aid", price: 22 }
         ];
 
-        // ---------- ADVANCED AI KNOWLEDGE BASE ----------
+        // ---------- ADVANCED AI KNOWLEDGE BASE (Conversational + Hindi/Hinglish) ----------
         const AI_KNOWLEDGE = {
-            // Diseases & Conditions
+            "dath me dard": {
+                info: "दांत में दर्द (Toothache) कई कारणों से हो सकता है - कैविटी, इंफेक्शन, मसूड़ों की समस्या, या दांत में फ्रैक्चर।",
+                causes: "दांतों में सड़न (कैविटी), दांत का संक्रमण (एब्सेस), मसूड़ों की बीमारी, दांत में दरार, वॉइसम टूथ, साइनस संक्रमण।",
+                treatment: "दर्द निवारक (पैरासिटामोल या इबुप्रोफेन), लौंग का तेल, नमक के पानी से कुल्ला, डेंटिस्ट से संपर्क करें।",
+                medicines: ["Dolo 650mg", "Combiflam", "Voveran SR 100", "Zerodol SP"],
+                prevention: "नियमित ब्रशिंग, फ्लॉसिंग, मीठा कम खाएं, डेंटल चेक-अप करवाएं।"
+            },
+            "toothache": {
+                info: "Toothache is pain in or around a tooth. It can be caused by tooth decay, infection, gum disease, or injury.",
+                causes: "Dental cavity, abscess, cracked tooth, gum infection, wisdom tooth eruption, sinusitis.",
+                treatment: "Pain relievers like paracetamol or ibuprofen, clove oil, salt water rinse. See a dentist immediately.",
+                medicines: ["Dolo 650mg", "Combiflam", "Voveran SR 100", "Zerodol SP"],
+                prevention: "Regular brushing, flossing, dental check-ups, avoid sugary foods."
+            },
             "fever": {
                 info: "Fever (pyrexia) is an elevated body temperature above the normal range of 98.6°F (37°C). It's a common symptom of various infections and conditions.",
                 causes: "Bacterial or viral infections, heat exhaustion, inflammatory conditions, medications, or cancer.",
@@ -2017,12 +2043,26 @@
                 medicines: ["Dolo 650mg", "Calpol 500mg", "Crocin Advance", "Combiflam"],
                 prevention: "Stay hydrated, maintain good hygiene, avoid exposure to infections."
             },
+            "bukhar": {
+                info: "बुखार शरीर का तापमान सामान्य से अधिक होना है। यह संक्रमण या अन्य बीमारियों का संकेत हो सकता है।",
+                causes: "बैक्टीरियल या वायरल संक्रमण, हीट एग्जॉशन, सूजन, दवाओं के साइड इफेक्ट।",
+                treatment: "आराम करें, पानी पीएं, पैरासिटामोल (Dolo 650mg, Calpol 500mg) लें। अगर बुखार 103°F से ज्यादा हो या 3 दिन से ज्यादा रहे तो डॉक्टर को दिखाएं।",
+                medicines: ["Dolo 650mg", "Calpol 500mg", "Crocin Advance", "Combiflam"],
+                prevention: "हाइड्रेटेड रहें, अच्छी स्वच्छता बनाए रखें, संक्रमण से बचें।"
+            },
             "headache": {
                 info: "Headache is pain in the head or upper neck. It can be tension-type, migraine, cluster, or caused by other conditions.",
                 causes: "Stress, tension, dehydration, sinusitis, migraine, eye strain, caffeine withdrawal.",
                 treatment: "Rest, hydration, pain relievers like paracetamol or ibuprofen. For migraines, triptans or ergotamine may be prescribed.",
                 medicines: ["Dolo 650mg", "Calpol 500mg", "Crocin Advance", "Combiflam"],
                 prevention: "Regular sleep, hydration, stress management, avoiding triggers."
+            },
+            "sir dard": {
+                info: "सिरदर्द सिर या ऊपरी गर्दन में दर्द है। यह टेंशन, माइग्रेन, या किसी बीमारी के कारण हो सकता है।",
+                causes: "तनाव, नींद की कमी, डिहाइड्रेशन, साइनस, आंखों पर जोर, कैफीन की कमी।",
+                treatment: "आराम करें, पानी पीएं, पैरासिटामोल या इबुप्रोफेन लें। माइग्रेन के लिए डॉक्टर को दिखाएं।",
+                medicines: ["Dolo 650mg", "Calpol 500mg", "Crocin Advance", "Combiflam"],
+                prevention: "नियमित नींद, हाइड्रेशन, तनाव से बचें।"
             },
             "cold": {
                 info: "Common cold is a viral infection of the upper respiratory tract. It's usually harmless and self-limiting.",
@@ -2038,19 +2078,19 @@
                 medicines: ["Ascoril LS Syrup 100ml", "Benadryl Cough Syrup", "Asthalin Inhaler"],
                 prevention: "Avoid smoking, stay hydrated, manage allergies."
             },
-            "allergy": {
-                info: "Allergy is an immune system response to a substance (allergen) that is normally harmless.",
-                causes: "Pollen, dust mites, pet dander, certain foods, medications, insect stings.",
-                treatment: "Antihistamines like Cetirizine (Alerid), Fexofenadine (Allegra), Montelukast (Montair-LC). Avoid allergens.",
-                medicines: ["Alerid 10mg", "Allegra 120mg", "Levocetirizine 5mg", "Montair-LC"],
-                prevention: "Avoid known allergens, use air purifiers, keep windows closed during high pollen seasons."
-            },
             "acidity": {
                 info: "Acidity or acid reflux occurs when stomach acid flows back into the esophagus, causing heartburn and discomfort.",
                 causes: "Spicy foods, citrus, caffeine, alcohol, smoking, obesity, pregnancy, Hiatal hernia.",
                 treatment: "Antacids, proton pump inhibitors like Pantoprazole (Pantocid), Omeprazole (Omez), lifestyle changes.",
                 medicines: ["Pan-D", "Pantocid 40mg", "Omez 20mg", "Rantac 150mg"],
                 prevention: "Avoid trigger foods, eat small meals, don't lie down immediately after eating."
+            },
+            "esiditi": {
+                info: "एसिडिटी या एसिड रिफ्लक्स तब होता है जब पेट का एसिड वापस फूड पाइप में आ जाता है, जिससे जलन और बेचैनी होती है।",
+                causes: "मसालेदार भोजन, सिट्रस, कैफीन, शराब, धूम्रपान, मोटापा, गर्भावस्था।",
+                treatment: "एंटासिड, पैंटोप्राजोल (Pantocid), ओमेप्राजोल (Omez), जीवनशैली में बदलाव।",
+                medicines: ["Pan-D", "Pantocid 40mg", "Omez 20mg", "Rantac 150mg"],
+                prevention: "मसालेदार भोजन से बचें, छोटे-छोटे भोजन करें, खाने के तुरंत बाद लेटें नहीं।"
             },
             "infection": {
                 info: "Infection occurs when harmful microorganisms (bacteria, viruses, fungi, parasites) enter and multiply in the body.",
@@ -2072,13 +2112,6 @@
                 treatment: "ACE inhibitors, ARBs, calcium channel blockers, diuretics, lifestyle modifications.",
                 medicines: ["Telma 40mg", "Cilacar 10", "Met XL 25", "Ecosprin 75mg"],
                 prevention: "Reduce salt intake, regular exercise, stress management, maintain healthy weight."
-            },
-            "toothache": {
-                info: "Toothache is pain in or around a tooth. It can be caused by tooth decay, infection, gum disease, or injury.",
-                causes: "Dental cavity, abscess, cracked tooth, gum infection, wisdom tooth eruption, sinusitis.",
-                treatment: "Pain relievers like paracetamol or ibuprofen, clove oil, salt water rinse. See a dentist immediately.",
-                medicines: ["Dolo 650mg", "Combiflam", "Voveran SR 100", "Zerodol SP"],
-                prevention: "Regular brushing, flossing, dental check-ups, avoid sugary foods."
             },
             "nail": {
                 info: "Nail problems can include fungal infections, ingrown nails, brittle nails, discoloration, or ridges.",
@@ -2107,27 +2140,6 @@
                 treatment: "ORS (Oral Rehydration Salts), Loperamide (Eldoper), probiotics (Econorm Sachet), rest.",
                 medicines: ["Eldoper 2mg", "Econorm Sachet", "ORS Powder Sachet"],
                 prevention: "Good hand hygiene, safe food handling, avoid contaminated water."
-            },
-            "eye": {
-                info: "Eye problems include dry eyes, infections, allergies, refractive errors, and conjunctivitis.",
-                causes: "Bacterial or viral infections, allergies, prolonged screen time, dry environment, inadequate blinking.",
-                treatment: "Artificial tears, antibiotic drops, antihistamine drops, proper eye care.",
-                medicines: ["Refresh Tears 10ml", "Moxicip Eye Drops", "Systane Ultra 10ml"],
-                prevention: "Regular breaks from screens, proper lighting, eye protection."
-            },
-            "wound": {
-                info: "Wound care involves cleaning, disinfection, and protection of open wounds to prevent infection and promote healing.",
-                types: "Abrasions, lacerations, punctures, incisions, burns, ulcers.",
-                treatment: "Clean with antiseptics (Betadine), cover with sterile dressing (Hansaplast), tetanus shot if needed.",
-                medicines: ["Betadine Ointment 15g", "Hansaplast Strips (20s)", "Dettol Antiseptic 250ml"],
-                prevention: "Use proper protection, keep wounds clean and dry."
-            },
-            "vitamin": {
-                info: "Vitamins are essential nutrients required for normal body function. Deficiencies can cause various health issues.",
-                types: "Vitamin A, B-complex, C, D, E, K. Each has specific functions and deficiency symptoms.",
-                treatment: "Supplementation of deficient vitamins, balanced diet, fortification.",
-                medicines: ["Zincovit Tablet", "Shelcal 500", "Neurobion Forte", "Limcee 500mg"],
-                prevention: "Eat a balanced diet rich in fruits, vegetables, and fortified foods."
             }
         };
 
@@ -2268,7 +2280,13 @@
             static low() { return AppState.inventory.filter(m => m.stock < CONFIG.STOCK.LOW_THRESHOLD).sort((a, b) => a
                     .stock - b.stock); }
             static expiring() {
-                return AppState.inventory.filter(m => Utils.isExpiringSoon(m.expiryMonth, m.expiryYear))
+                return AppState.inventory.filter(m => Utils.isExpiringSoon(m.expiryMonth, m.expiryYear) && !Utils
+                    .isExpired(m.expiryMonth, m.expiryYear))
+                    .sort((a, b) => Utils.daysUntilExpiry(a.expiryMonth, a.expiryYear) - Utils.daysUntilExpiry(b
+                        .expiryMonth, b.expiryYear));
+            }
+            static expired() {
+                return AppState.inventory.filter(m => Utils.isExpired(m.expiryMonth, m.expiryYear))
                     .sort((a, b) => Utils.daysUntilExpiry(a.expiryMonth, a.expiryYear) - Utils.daysUntilExpiry(b
                         .expiryMonth, b.expiryYear));
             }
@@ -2371,6 +2389,10 @@
                 const m = Inventory.find(id);
                 if (!m) { Toast.error("Medicine unavailable"); return; }
                 if (m.stock <= 0) { Toast.error("Out of stock", `${m.name} has zero units.`); return; }
+                if (Utils.isExpired(m.expiryMonth, m.expiryYear)) {
+                    Toast.error("Expired Medicine", `${m.name} has expired! Cannot sell.`);
+                    return;
+                }
                 const l = Billing.findLine(id);
                 if (l) { if (l.quantity + 1 > m.stock) { Toast.error("Insufficient stock!",
                         `Only ${m.stock} units available.`);
@@ -2426,8 +2448,9 @@
                     const m = Inventory.find(l.id);
                     if (!m) { fails.push(`${l.name} no longer exists`); continue; }
                     if (l.quantity > m.stock) fails.push(`${m.name}: only ${m.stock} units available`);
+                    if (Utils.isExpired(m.expiryMonth, m.expiryYear)) fails.push(`${m.name} has expired!`);
                 }
-                if (fails.length > 0) { Toast.error("Insufficient stock!", fails[0]); return; }
+                if (fails.length > 0) { Toast.error("Transaction failed!", fails[0]); return; }
                 AppState.cart.forEach(l => { const m = Inventory.find(l.id); if (m) m.stock = Math.max(0, m.stock - l
                         .quantity); });
                 const t = Billing.totals();
@@ -2479,6 +2502,7 @@
                 if (v === "settings") UI.renderSettings();
                 if (v === "lowstock") UI.renderLowStock();
                 if (v === "expiry") UI.renderExpiry();
+                if (v === "expired") UI.renderExpired();
                 if (v === "aiassistant") UI.renderAI();
             }
             static refreshAll() {
@@ -2489,6 +2513,7 @@
                 UI.renderAlerts();
                 UI.renderLowStock();
                 UI.renderExpiry();
+                UI.renderExpired();
                 UI.populateCategories();
                 UI.updateHeader();
             }
@@ -2512,10 +2537,12 @@
             static renderAlerts() {
                 const count = Inventory.low().length;
                 const expCount = Inventory.expiring().length;
+                const expdCount = Inventory.expired().length;
                 const d = document.getElementById("bellCount");
                 const p = document.getElementById("navLowPill");
                 const ed = document.getElementById("expiryCount");
                 const ep = document.getElementById("navExpiryPill");
+                const epd = document.getElementById("navExpiredPill");
                 d.textContent = count > 99 ? "99+" : count;
                 d.classList.toggle("hidden", count === 0);
                 p.textContent = count > 99 ? "99+" : count;
@@ -2524,11 +2551,14 @@
                 ed.classList.toggle("hidden", expCount === 0);
                 ep.textContent = expCount > 99 ? "99+" : expCount;
                 ep.classList.toggle("hidden", expCount === 0);
+                epd.textContent = expdCount > 99 ? "99+" : expdCount;
+                epd.classList.toggle("hidden", expdCount === 0);
             }
             static renderDashboard() {
                 const inv = Inventory.all(),
                     low = Inventory.low(),
                     exp = Inventory.expiring(),
+                    expd = Inventory.expired(),
                     crit = low.filter(m => m.stock <= CONFIG.STOCK.CRITICAL_MAX).length;
                 const urgentExp = exp.filter(m => Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear) <= CONFIG.EXPIRY
                     .URGENT).length;
@@ -2539,8 +2569,8 @@
                 document.getElementById("kpiRevenueSub").textContent = `${InvoiceManager.todayCount()} invoices today`;
                 document.getElementById("kpiMedicines").textContent = Utils.num(new Set(inv.map(m => m.name)).size);
                 document.getElementById("kpiMedicinesSub").textContent = `${Utils.num(inv.length)} batch records`;
-                document.getElementById("kpiExpiry").textContent = Utils.num(exp.length);
-                document.getElementById("kpiExpirySub").textContent = `${urgentExp} urgent · within 30 days`;
+                document.getElementById("kpiExpired").textContent = Utils.num(expd.length);
+                document.getElementById("kpiExpiredSub").textContent = `${expd.length} expired batches`;
 
                 document.getElementById("statBatches").textContent = Utils.num(inv.length);
                 document.getElementById("statUnits").textContent = Utils.num(Inventory.totalUnits());
@@ -2552,7 +2582,7 @@
                     .invoices.length : 0);
 
                 const st = document.getElementById("opStatus");
-                if (crit > 0 || urgentExp > 0) { st.textContent = "ATTENTION REQUIRED";
+                if (crit > 0 || urgentExp > 0 || expd.length > 0) { st.textContent = "ATTENTION REQUIRED";
                     st.className = "badge badge-red"; } else if (low.length > 0 || exp.length > 0) { st.textContent =
                         "MONITORING";
                     st.className = "badge badge-orange"; } else { st.textContent = "OPERATIONAL";
@@ -2579,6 +2609,13 @@
                     const days = Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear);
                     return `<div class="mini-row ${status.row}"><div><b>${Utils.esc(m.name)}</b><small>${Utils.esc(m.batchId)} · ${Utils.esc(m.category)}</small></div><div style="text-align:right"><span class="badge ${status.cls}">${status.label}</span><small style="display:block;color:var(--slate-500);font-weight:700;margin-top:4px">${days} days left</small></div></div>`;
                 }).join("") : `<div class="empty">No medicines expiring in the next 30 days.</div>`;
+
+                const exh = document.getElementById("dashExpired");
+                const expdTop = expd.slice(0, 7);
+                exh.innerHTML = expdTop.length ? expdTop.map(m => {
+                    const days = Math.abs(Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear));
+                    return `<div class="mini-row expired"><div><b>${Utils.esc(m.name)}</b><small>${Utils.esc(m.batchId)} · ${Utils.esc(m.category)}</small></div><div style="text-align:right"><span class="badge badge-expired">EXPIRED</span><small style="display:block;color:var(--danger);font-weight:700;margin-top:4px">${days} days overdue</small></div></div>`;
+                }).join("") : `<div class="empty">No expired medicines.</div>`;
             }
 
             static renderSuggestions(term) {
@@ -2586,7 +2623,8 @@
                 const q = String(term || "").trim();
                 if (!q) { box.classList.remove("open");
                     box.innerHTML = ""; return; }
-                const matches = Inventory.search(q).filter(m => m.stock > 0).slice(0, 30);
+                const matches = Inventory.search(q).filter(m => m.stock > 0 && !Utils.isExpired(m.expiryMonth, m
+                    .expiryYear)).slice(0, 30);
                 if (!matches.length) { box.innerHTML = `<div class="empty">No matches for “${Utils.esc(q)}”.</div>`;
                     box.classList.add("open"); return; }
                 box.innerHTML = matches.map(m => {
@@ -2648,7 +2686,9 @@
                         const s = Inventory.severity(m.stock);
                         const e = Utils.getExpiryStatus(m.expiryMonth, m.expiryYear);
                         const days = Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear);
-                        return `<tr class="${s.row} ${e.row}"><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="cell-strong">${Utils.esc(m.name)}</span></td><td>${Utils.esc(m.generic)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td class="cell-strong">${Utils.inr(m.price)}</td><td><span class="badge ${s.cls}">${m.stock}</span></td><td>${String(m.expiryMonth).padStart(2,"0")}/${m.expiryYear} <span class="badge ${e.cls}" style="font-size:9px;padding:2px 6px">${e.label} ${days >= 0 ? `(${days}d)` : ""}</span></td><td><span class="badge ${e.cls}">${e.label}</span></td><td><div class="row-actions"><button class="btn btn-outline btn-sm" data-edit="${Utils.esc(m.id)}">✏ Edit</button><button class="btn btn-danger btn-sm" data-delete="${Utils.esc(m.id)}">🗑 Delete</button></div></td></tr>`;
+                        const isExpired = Utils.isExpired(m.expiryMonth, m.expiryYear);
+                        const rowClass = isExpired ? 'expired' : (s.row || e.row);
+                        return `<tr class="${rowClass}"><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="cell-strong">${Utils.esc(m.name)}</span></td><td>${Utils.esc(m.generic)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td class="cell-strong">${Utils.inr(m.price)}</td><td><span class="badge ${s.cls}">${m.stock}</span></td><td>${String(m.expiryMonth).padStart(2,"0")}/${m.expiryYear} <span class="badge ${e.cls}" style="font-size:9px;padding:2px 6px">${e.label} ${days >= 0 ? `(${days}d)` : "EXPIRED"}</span></td><td><span class="badge ${e.cls}">${e.label}</span></td><td><div class="row-actions"><button class="btn btn-outline btn-sm" data-edit="${Utils.esc(m.id)}">✏ Edit</button><button class="btn btn-danger btn-sm" data-delete="${Utils.esc(m.id)}">🗑 Delete</button></div></td></tr>`;
                     }).join("");
                 }
                 document.getElementById("invCountBadge").textContent = `${Utils.num(rows.length)} records`;
@@ -2671,7 +2711,8 @@
                 const body = document.getElementById("lowBody");
                 body.innerHTML = rows.length ? rows.map(m => {
                     const s = Inventory.severity(m.stock);
-                    return `<tr class="${s.row}"><td><span class="cell-strong">${Utils.esc(m.name)}</span><small class="cell-sub">${Utils.esc(m.generic)}</small></td><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td class="cell-strong">${m.stock} units</td><td><span class="badge ${s.cls}">${s.label}</span></td><td><button class="btn btn-sm" data-restock="${Utils.esc(m.id)}">＋ Restock</button></td></tr>`;
+                    const expired = Utils.isExpired(m.expiryMonth, m.expiryYear);
+                    return `<tr class="${expired ? 'expired' : s.row}"><td><span class="cell-strong">${Utils.esc(m.name)}</span><small class="cell-sub">${Utils.esc(m.generic)}</small></td><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td class="cell-strong">${m.stock} units</td><td><span class="badge ${expired ? 'badge-expired' : s.cls}">${expired ? 'EXPIRED' : s.label}</span></td><td><button class="btn btn-sm" data-restock="${Utils.esc(m.id)}">＋ Restock</button></td></tr>`;
                 }).join("") : `<tr><td colspan="6" class="empty">No low stock alerts.</td></tr>`;
             }
 
@@ -2683,7 +2724,8 @@
                 const soon = all.filter(m => Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear) > CONFIG.EXPIRY.URGENT);
                 document.getElementById("expUrgent").textContent = urgent.length;
                 document.getElementById("expSoon").textContent = soon.length;
-                document.getElementById("expSafe").textContent = Inventory.all().length - all.length;
+                document.getElementById("expSafe").textContent = Inventory.all().length - all.length - Inventory.expired()
+                    .length;
                 document.getElementById("expCountBadge").textContent = `${rows.length} alerts`;
 
                 const body = document.getElementById("expBody");
@@ -2692,6 +2734,21 @@
                     const days = Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear);
                     return `<tr class="${status.row}"><td><span class="cell-strong">${Utils.esc(m.name)}</span><small class="cell-sub">${Utils.esc(m.generic)}</small></td><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td>${String(m.expiryMonth).padStart(2,"0")}/${m.expiryYear}</td><td class="cell-strong">${days} days</td><td><span class="badge ${status.cls}">${status.label}</span></td></tr>`;
                 }).join("") : `<tr><td colspan="6" class="empty">No medicines expiring in the next 30 days.</td></tr>`;
+            }
+
+            static renderExpired() {
+                const all = Inventory.expired();
+                const rows = Inventory.search(document.getElementById("expiredSearch").value, all);
+                document.getElementById("expiredCountBadge").textContent = `${rows.length} expired`;
+
+                const body = document.getElementById("expiredBody");
+                body.innerHTML = rows.length ? rows.map(m => {
+                    const days = Math.abs(Utils.daysUntilExpiry(m.expiryMonth, m.expiryYear));
+                    return `<tr class="expired"><td><span class="cell-strong">${Utils.esc(m.name)}</span><small class="cell-sub">${Utils.esc(m.generic)}</small></td><td class="mono">${Utils.esc(m.batchId)}</td><td><span class="badge badge-blue">${Utils.esc(m.category)}</span></td><td>${String(m.expiryMonth).padStart(2,"0")}/${m.expiryYear}</td><td class="cell-strong">${days} days overdue</td><td>${m.stock} units</td><td><button class="btn btn-danger btn-sm" data-delete-expired="${Utils.esc(m.id)}">🗑 Remove</button></td></tr>`;
+                }).join("") : `<tr><td colspan="7" class="empty">No expired medicines.</td></tr>`;
+                document.getElementById("expiredFootLeft").textContent = `Showing ${rows.length} expired batches`;
+                document.getElementById("expiredFootRight").textContent =
+                    `Total expired value: ${Utils.inr0(rows.reduce((s, m) => s + m.price * m.stock, 0))}`;
             }
 
             static renderInvoices() {
@@ -2717,7 +2774,7 @@
                 const chat = document.getElementById("aiChat");
                 if (chat && chat.children.length === 0) {
                     chat.innerHTML =
-                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by a comprehensive medical knowledge base.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• Drug interactions and side effects<br>• First aid guidance<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
+                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant. I can understand English, Hindi, and Hinglish.<br><br>💡 <strong>You can ask me like:</strong><br>• "Mere dath me dard hai"<br>• "What is the treatment for typhoid?"<br>• "बुखार कम करने के उपाय?"<br><br>I'll give you detailed answers with medicine suggestions!</div>`;
                 }
             }
 
@@ -2824,6 +2881,19 @@
                             Toast.success("Restocked", `${m.name} now holds ${m.stock} units.`);
                         });
                     } });
+            }
+
+            static removeExpired(id) {
+                const m = Inventory.find(id);
+                if (!m) return;
+                Modal.confirm({ title: "Remove Expired Medicine",
+                        message: `Remove expired ${m.name} (${m.batchId}) from inventory?`,
+                        confirmLabel: "Remove",
+                        onConfirm() {
+                            Inventory.remove(id);
+                            UI.refreshAll();
+                            Toast.success("Removed", `${m.name} expired batch removed.`);
+                        } });
             }
 
             static showInvoice(id, isNew = false) {
@@ -3001,6 +3071,29 @@
                         }
                     });
                 });
+
+                // Clear expired button
+                document.getElementById("clearExpiredBtn")?.addEventListener("click", () => {
+                    const expired = Inventory.expired();
+                    if (expired.length === 0) { Toast.info("No expired medicines", "All medicines are valid."); return; }
+                    Modal.confirm({
+                        title: "Remove All Expired Medicines",
+                        message: `Permanently remove ${expired.length} expired medicine batches from inventory?`,
+                        confirmLabel: "Remove All",
+                        danger: true,
+                        onConfirm() {
+                            expired.forEach(m => Inventory.remove(m.id));
+                            UI.refreshAll();
+                            Toast.success("Removed", `${expired.length} expired batches removed.`);
+                        }
+                    });
+                });
+
+                // Delete expired individual
+                document.getElementById("expiredBody")?.addEventListener("click", (e) => {
+                    const del = e.target.closest("[data-delete-expired]");
+                    if (del) UI.removeExpired(del.dataset.deleteExpired);
+                });
             }
 
             static bindPOS() {
@@ -3161,7 +3254,7 @@
                     if (!q) { UI.setError("aiQuery", "Please ask a question."); return null; }
                     UI.setError("aiQuery", "");
 
-                    // Check knowledge base
+                    // Check knowledge base - exact and partial matches
                     let response = null;
                     let matchedTopic = null;
 
@@ -3173,7 +3266,6 @@
                         }
                     }
 
-                    // If no exact match, try partial matching
                     if (!response) {
                         for (const [topic, data] of Object.entries(AI_KNOWLEDGE)) {
                             const words = topic.split(" ");
@@ -3188,25 +3280,48 @@
                         }
                     }
 
+                    // Check for Hindi/Hinglish variations
+                    if (!response) {
+                        const hindiMap = {
+                            "dath": "toothache",
+                            "dard": "pain relief",
+                            "bukhar": "fever",
+                            "sir dard": "headache",
+                            "esiditi": "acidity",
+                            "khansi": "cough",
+                            "jukam": "cold"
+                        };
+                        for (const [hi, en] of Object.entries(hindiMap)) {
+                            if (q.includes(hi)) {
+                                const found = AI_KNOWLEDGE[en];
+                                if (found) { response = found;
+                                    matchedTopic = en; break; }
+                            }
+                        }
+                    }
+
                     // Also check for medicines in inventory
-                    const medMatches = Inventory.search(q);
+                    const medMatches = Inventory.search(q).filter(m => !Utils.isExpired(m.expiryMonth, m.expiryYear));
                     const medNames = medMatches.map(m => m.name);
 
                     let html = '';
 
                     if (response) {
+                        const displayTopic = matchedTopic || "Health";
                         html += `<div class="ai-msg bot">`;
-                        html += `<strong>📋 ${matchedTopic.toUpperCase()}</strong><br><br>`;
+                        html += `<strong>📋 ${displayTopic.toUpperCase()}</strong><br><br>`;
                         html += `<strong>ℹ️ Info:</strong> ${response.info}<br><br>`;
                         html += `<strong>🩺 Causes:</strong> ${response.causes}<br><br>`;
                         html += `<strong>💊 Treatment:</strong> ${response.treatment}<br><br>`;
 
                         if (response.medicines && response.medicines.length > 0) {
-                            // Check which medicines are in stock
-                            const inStock = response.medicines.filter(m => Inventory.all().some(i => i.name === m && i
-                                .stock > 0));
-                            const outOfStock = response.medicines.filter(m => Inventory.all().some(i => i.name === m &&
-                                i.stock === 0));
+                            const inStock = response.medicines.filter(m =>
+                                Inventory.all().some(i => i.name === m && i.stock > 0 && !Utils.isExpired(i
+                                    .expiryMonth, i.expiryYear))
+                            );
+                            const outOfStock = response.medicines.filter(m =>
+                                Inventory.all().some(i => i.name === m && i.stock === 0)
+                            );
                             const notFound = response.medicines.filter(m => !Inventory.all().some(i => i.name === m));
 
                             if (inStock.length > 0) {
@@ -3238,10 +3353,11 @@
                         medNames.slice(0, 10).forEach(m => {
                             const med = Inventory.all().find(i => i.name === m);
                             const s = Inventory.severity(med.stock);
+                            const expired = Utils.isExpired(med.expiryMonth, med.expiryYear);
                             html +=
                                 `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;">
                                     <span><strong>${Utils.esc(m)}</strong> <small style="color:var(--slate-500)">${Utils.esc(med.generic)}</small></span>
-                                    <span><span class="badge ${s.cls}">${med.stock} units</span> <strong>${Utils.inr(med.price)}</strong></span>
+                                    <span><span class="badge ${expired ? 'badge-expired' : s.cls}">${expired ? 'EXPIRED' : med.stock + ' units'}</span> <strong>${Utils.inr(med.price)}</strong></span>
                                 </div>`;
                         });
                         html +=
@@ -3252,7 +3368,7 @@
                         html +=
                             `I couldn't find specific information about "${Utils.esc(text)}" in my knowledge base.<br><br>`;
                         html +=
-                            `💡 <strong>Try asking about:</strong><br>• Diseases: fever, cold, headache, acidity, diabetes, infection<br>• Symptoms: cough, allergy, body pain, diarrhea<br>• Medicines: paracetamol, ibuprofen, antibiotics<br>• Health topics: vitamins, skin care, wound care, eye care<br><br>`;
+                            `💡 <strong>Try asking about:</strong><br>• Diseases: fever, cold, headache, acidity, diabetes, infection, toothache<br>• Symptoms: cough, allergy, body pain, diarrhea<br>• Medicines: paracetamol, ibuprofen, antibiotics<br>• Health topics: vitamins, skin care, wound care, eye care<br><br>`;
                         html +=
                             `<small style="color:var(--slate-500)">You can also search our inventory for specific medicine names.</small>`;
                         html += `</div>`;
@@ -3276,7 +3392,6 @@
                         chat.appendChild(botMsg);
                         chat.scrollTop = chat.scrollHeight;
 
-                        // Attach event listeners for medicine suggestions
                         botMsg.querySelectorAll(".med-suggestion").forEach(el => {
                             el.addEventListener("click", () => {
                                 const id = el.dataset.add;
@@ -3296,7 +3411,7 @@
 
                 clearBtn.addEventListener("click", () => {
                     chat.innerHTML =
-                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by a comprehensive medical knowledge base.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• Drug interactions and side effects<br>• First aid guidance<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
+                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant. I can understand English, Hindi, and Hinglish.<br><br>💡 <strong>You can ask me like:</strong><br>• "Mere dath me dard hai"<br>• "What is the treatment for typhoid?"<br>• "बुखार कम करने के उपाय?"<br><br>I'll give you detailed answers with medicine suggestions!</div>`;
                     query.value = "";
                     Toast.info("Chat cleared", "Conversation history has been cleared.");
                 });
@@ -3319,8 +3434,11 @@
                             cough: "What causes cough and how to stop it?",
                             diabetes: "What is diabetes and how to manage it?",
                             "blood pressure": "What is blood pressure and how to control it?",
-                            toothache: "What causes toothache and how to relieve it?",
-                            nail: "What are common nail problems and how to fix them?"
+                            toothache: "Mere dath me dard hai",
+                            nail: "What are common nail problems and how to fix them?",
+                            pain: "What is the best pain relief medicine?",
+                            skin: "What are common skin problems and treatments?",
+                            diarrhea: "What causes diarrhea and how to treat it?"
                         };
                         query.value = map[val] || val;
                         processQuery(query.value);
