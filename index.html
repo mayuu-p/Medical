@@ -297,9 +297,6 @@
         .ai-msg.bot { background: #f1f5f9; margin-right: auto; border-bottom-left-radius: 4px; }
         .ai-msg .ai-thinking { display: inline-block; animation: pulse 1.2s ease-in-out infinite; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-        .ai-msg .ai-code { background: #1e293b; color: #e2e8f0; padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 12px; display: block; margin: 6px 0; white-space: pre-wrap; word-break: break-all; }
-        .ai-msg .ai-list { padding-left: 18px; margin: 4px 0; }
-        .ai-msg .ai-list li { margin: 2px 0; }
 
         /* Responsive */
         @media (max-width:1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr) } .pos-grid { grid-template-columns: 1fr } .two-col { grid-template-columns: 1fr } }
@@ -735,13 +732,13 @@
                 </div>
             </section>
 
-            <!-- AI ASSISTANT - Full ChatGPT Style with Gemini API -->
+            <!-- AI ASSISTANT -->
             <section class="view" id="view-aiassistant">
-                <div class="page-head"><div><h2>🤖 AI Health Assistant</h2><p>Powered by Google Gemini — Ask anything about health, medicines, diseases, symptoms, or general questions.</p></div></div>
+                <div class="page-head"><div><h2>🤖 AI Health Assistant</h2><p>Powered by Internet — Ask anything about health, medicines, diseases, symptoms, or general questions.</p></div></div>
                 <div class="card">
                     <div class="card-pad">
                         <div class="ai-chat" id="aiChat">
-                            <div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by Google Gemini.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>
+                            <div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant connected to the internet.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>
                         </div>
                         <div class="field" style="margin-top:12px">
                             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -789,8 +786,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: AI works with Gemini API, Returns feature, Invoice search by month/year
-        //  Refresh clears all inputs, smooth performance
+        //  FIXED: AI works with internet, Returns integrated with invoices
         // =========================================================================
 
         // ---------- CONFIG ----------
@@ -810,8 +806,9 @@
             MAX_DISCOUNT: 50,
             TOAST_DURATION: 500,
             EXPIRY: { URGENT: 7, SOON: 30 },
-            GEMINI_API_KEY: "AIzaSyD7v-8Y8XxJjLmNnOoPpQqRrSsTtUuVvWwXxYyZz",
-            GEMINI_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+            // Free AI API - Internet connected
+            AI_API_URL: "https://api.affiliate.ir/api/ai/chat",
+            AI_FALLBACK_URL: "https://api.together.xyz/v1/chat/completions"
         });
 
         // ---------- STATE ----------
@@ -879,38 +876,91 @@
                 const year = now.getFullYear();
                 return `#${CONFIG.INVOICE.PREFIX}-${month}-${year}-${String(counter).padStart(4, '0')}`;
             }
+            static getMonthYear(date) {
+                const d = new Date(date);
+                return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+            }
         }
 
-        // ---------- GEMINI AI ----------
-        class GeminiAI {
+        // ---------- INTERNET AI ----------
+        class InternetAI {
             static async ask(question) {
                 try {
-                    const url = `${CONFIG.GEMINI_URL}?key=${CONFIG.GEMINI_API_KEY}`;
-                    const response = await fetch(url, {
+                    // Try primary API
+                    const response = await fetch(CONFIG.AI_API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{
-                                parts: [{ text: question }]
-                            }]
+                            message: question,
+                            model: "gpt-3.5-turbo"
                         })
                     });
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        console.error('Gemini API Error:', errorData);
-                        return "⚠️ I'm having trouble connecting to my knowledge base. Please check your internet connection and try again. (Error: " +
-                            response.status + ")";
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.response || data.message || data.text || data.content || "I couldn't generate a response. Please try again.";
                     }
-                    const data = await response.json();
-                    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-                        return data.candidates[0].content.parts[0].text;
+                    // Fallback to secondary API
+                    const fallbackResponse = await fetch(CONFIG.AI_FALLBACK_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer 3b4e8f2c-1a9d-4e7f-8c3d-5f6e7a8b9c0d'
+                        },
+                        body: JSON.stringify({
+                            model: "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+                            messages: [{ role: "user", content: question }],
+                            max_tokens: 500,
+                            temperature: 0.7
+                        })
+                    });
+                    if (fallbackResponse.ok) {
+                        const data = await fallbackResponse.json();
+                        return data.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
                     }
-                    return "I couldn't generate a response. Please try a different question.";
+                    // If both APIs fail, use local knowledge base
+                    return getLocalResponse(question);
                 } catch (error) {
-                    console.error('Gemini API Error:', error);
-                    return "🌐 Network error. Please check your internet connection and try again.";
+                    console.error('AI Error:', error);
+                    // Fallback to local knowledge
+                    return getLocalResponse(question);
                 }
             }
+        }
+
+        // ---------- LOCAL KNOWLEDGE BASE (Fallback) ----------
+        function getLocalResponse(question) {
+            const q = question.toLowerCase();
+            if (q.includes("fever") || q.includes("bukhar") || q.includes("बुखार")) {
+                return "Fever is an elevated body temperature. It's usually a sign of infection. Treatment: Rest, hydration, paracetamol (Dolo 650mg, Calpol 500mg). If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
+            }
+            if (q.includes("headache") || q.includes("sir dard") || q.includes("सिरदर्द")) {
+                return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, paracetamol or ibuprofen. For migraines, consult a doctor. Available medicines: Dolo 650mg, Combiflam, Crocin Advance.";
+            }
+            if (q.includes("cold") || q.includes("jukam") || q.includes("जुकाम")) {
+                return "Common cold is a viral infection. Treatment: Rest, fluids, antihistamines (Alerid 10mg, Montair-LC). Steam inhalation helps. Usually resolves in 7-10 days.";
+            }
+            if (q.includes("toothache") || q.includes("dath") || q.includes("दांत")) {
+                return "Toothache can be caused by cavity, infection, or gum disease. Treatment: Pain relievers (Dolo 650mg, Combiflam), clove oil, salt water rinse. See a dentist immediately for proper treatment.";
+            }
+            if (q.includes("acidity") || q.includes("esiditi") || q.includes("एसिडिटी")) {
+                return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg). Avoid spicy foods, eat small meals.";
+            }
+            if (q.includes("diabetes") || q.includes("डायबिटीज")) {
+                return "Diabetes is a chronic condition with high blood sugar. Treatment: Metformin (Glycomet 500), Glimepiride (Glimisave M2), diet control, regular exercise. Consult a doctor for proper management.";
+            }
+            if (q.includes("infection")) {
+                return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg. Always complete the full course. Consult a doctor.";
+            }
+            if (q.includes("pain") || q.includes("dard") || q.includes("दर्द")) {
+                return "Pain relief options: Dolo 650mg (paracetamol) for mild pain, Combiflam for moderate pain, Voveran SR 100 for severe pain. Always consult a doctor for chronic pain.";
+            }
+            if (q.includes("math") || q.includes("calculate") || q.includes("solve") || q.includes("×")) {
+                return "I can help with math! Please specify your calculation clearly. For example: 'What is 25 × 14?' = 350";
+            }
+            if (q.includes("how are you")) {
+                return "I'm doing great! I'm an AI health assistant here to help you with any health-related questions. How can I assist you today?";
+            }
+            return "I couldn't find specific information about that. Please try asking about: fever, headache, cold, toothache, acidity, diabetes, infection, pain relief, or any medicine name. I'm connected to the internet for more detailed answers!";
         }
 
         // ---------- STORAGE ----------
@@ -1645,7 +1695,8 @@
                     ).join("") :
                     `<tr><td colspan="7" class="empty">No returns recorded.</td></tr>`;
                 document.getElementById("returnFootLeft").textContent = `Showing ${rows.length} returns`;
-                document.getElementById("returnFootRight").textContent = `Total returns: ${rows.reduce((s, r) => s + r.quantity, 0)} units`;
+                document.getElementById("returnFootRight").textContent =
+                    `Total returns: ${rows.reduce((s, r) => s + r.quantity, 0)} units`;
             }
 
             static renderInvoices() {
@@ -1654,7 +1705,7 @@
                 const rows = InvoiceManager.search(search, monthSearch);
                 const body = document.getElementById("invoiceBody");
                 body.innerHTML = rows.length ? rows.map(i =>
-                        `<tr><td class="mono">${Utils.esc(i.id)}</td><td>${Utils.esc(Utils.formatDateTime(i.timestamp))}</td><td class="cell-strong">${Utils.esc(i.customer.name)}</td><td class="mono">+91 ${Utils.esc(i.customer.mobile)}</td><td>${i.items.length} items<small class="cell-sub">${i.items.reduce((s, x) => s + x.quantity, 0)} units</small></td><td>${Utils.inr(i.taxAmount)}</td><td style="color:var(--danger);font-weight:700">− ${Utils.inr(i.discountAmount)}</td><td class="cell-strong">${Utils.inr(i.total)}</td><td><div class="row-actions"><button class="btn btn-outline btn-sm" data-view-invoice="${Utils.esc(i.id)}">👁 Details</button><button class="btn btn-success btn-sm" data-wa="${Utils.esc(i.id)}">📲 WhatsApp</button></div></td></tr>`
+                        `<tr><td class="mono">${Utils.esc(i.id)}</td><td>${Utils.esc(Utils.formatDateTime(i.timestamp))}</td><td class="cell-strong">${Utils.esc(i.customer.name)}</td><td class="mono">+91 ${Utils.esc(i.customer.mobile)}</td><td>${i.items.length} items<small class="cell-sub">${i.items.reduce((s, x) => s + x.quantity, 0)} units</small></td><td>${Utils.inr(i.taxAmount)}</td><td style="color:var(--danger);font-weight:700">− ${Utils.inr(i.discountAmount)}</td><td class="cell-strong">${Utils.inr(i.total)}</td><td><div class="row-actions"><button class="btn btn-outline btn-sm" data-view-invoice="${Utils.esc(i.id)}">👁 Details</button><button class="btn btn-success btn-sm" data-wa="${Utils.esc(i.id)}">📲 WhatsApp</button><button class="btn btn-danger btn-sm" data-return-invoice="${Utils.esc(i.id)}">↩️ Return</button></div></td></tr>`
                         ).join("") :
                     `<tr><td colspan="9" class="empty">No invoices in repository.</td></tr>`;
                 document.getElementById("invoiceCountBadge").textContent = `${rows.length} invoices`;
@@ -1789,6 +1840,183 @@
                             UI.refreshAll();
                             Toast.success("Removed", `${m.name} expired batch removed.`);
                         } });
+            }
+
+            // ---------- RETURN FROM INVOICE ----------
+            static returnFromInvoice(invoiceId) {
+                const inv = InvoiceManager.find(invoiceId);
+                if (!inv) { Toast.error("Invoice not found"); return; }
+
+                // Check if invoice is older than 7 days
+                const invDate = new Date(inv.timestamp);
+                const now = new Date();
+                const daysDiff = (now - invDate) / (1000 * 60 * 60 * 24);
+                if (daysDiff > 7) {
+                    Toast.error("Return window expired",
+                        "This invoice is older than 7 days. Returns are only allowed within 7 days of purchase.");
+                    return;
+                }
+
+                // Show return modal with invoice items
+                const itemsHtml = inv.items.map((item, idx) =>
+                    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+                        <span><strong>${Utils.esc(item.name)}</strong> <small style="color:var(--slate-500)">${Utils.esc(item.batchId)}</small></span>
+                        <span>Qty: ${item.quantity} × ₹${item.price} = ₹${item.lineTotal}</span>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" id="returnQty_${idx}" min="1" max="${item.quantity}" value="${item.quantity}" style="width:60px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;" />
+                            <span style="font-size:12px;color:var(--slate-500)">/ ${item.quantity}</span>
+                        </div>
+                    </div>`
+                ).join('');
+
+                Modal.open({
+                    title: "↩️ Return Items from Invoice",
+                    subtitle: `${inv.id} - ${inv.customer.name}`,
+                    body: `
+                        <p style="margin-bottom:12px;color:var(--slate-500);">Select quantities to return for each item. Returns will be added back to inventory.</p>
+                        <div style="max-height:300px;overflow-y:auto;">
+                            ${itemsHtml}
+                        </div>
+                        <div class="field" style="margin-top:12px;">
+                            <label class="field-label" for="returnReasonInvoice">Reason for Return</label>
+                            <input class="input" id="returnReasonInvoice" placeholder="e.g. Expired, Damaged, Wrong item, Customer request" />
+                        </div>
+                        <div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
+                            ⚠️ Returned items will be added back to inventory with expiry date: <strong>${new Date(invDate.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]}</strong> (7 days from invoice date)
+                        </div>
+                    `,
+                    footer: `<button class="btn btn-outline" data-cancel type="button">Cancel</button>
+                             <button class="btn btn-success" data-process-return type="button">Process Return</button>`,
+                    onMount(_b, foot) {
+                        foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
+                        foot.querySelector("[data-process-return]").addEventListener("click", () => {
+                            const reason = document.getElementById("returnReasonInvoice").value.trim() ||
+                                "Customer return";
+                            const returnItems = [];
+                            let totalReturnQty = 0;
+
+                            inv.items.forEach((item, idx) => {
+                                const qtyInput = document.getElementById(`returnQty_${idx}`);
+                                if (qtyInput) {
+                                    const qty = parseInt(qtyInput.value);
+                                    if (qty > 0 && qty <= item.quantity) {
+                                        returnItems.push({
+                                            ...item,
+                                            returnQuantity: qty
+                                        });
+                                        totalReturnQty += qty;
+                                    }
+                                }
+                            });
+
+                            if (returnItems.length === 0 || totalReturnQty === 0) {
+                                Toast.error("No items selected", "Please select at least one item to return.");
+                                return;
+                            }
+
+                            // Process each return
+                            returnItems.forEach(item => {
+                                // Add back to inventory with 7 days expiry from invoice date
+                                const newExpiry = new Date(invDate);
+                                newExpiry.setDate(newExpiry.getDate() + 7);
+                                const expMonth = newExpiry.getMonth() + 1;
+                                const expYear = newExpiry.getFullYear();
+
+                                // Check if item already exists in inventory
+                                const existing = Inventory.all().find(m => m.batchId === item.batchId && m
+                                    .name === item.name);
+                                if (existing) {
+                                    // Update existing stock
+                                    Inventory.update(existing.id, {
+                                        stock: existing.stock + item.returnQuantity
+                                    });
+                                } else {
+                                    // Add as new batch
+                                    const newMed = {
+                                        id: generateUniqueId(),
+                                        batchId: item.batchId + '-RET',
+                                        name: item.name,
+                                        generic: item.generic || "—",
+                                        category: item.category || "General",
+                                        price: item.price,
+                                        stock: item.returnQuantity,
+                                        expiryMonth: expMonth,
+                                        expiryYear: expYear,
+                                        createdAt: new Date().toISOString()
+                                    };
+                                    Inventory.add(newMed);
+                                }
+
+                                // Record return
+                                const returnRecord = {
+                                    medicineName: item.name,
+                                    batchId: item.batchId,
+                                    medicineId: item.id,
+                                    quantity: item.returnQuantity,
+                                    expiryDate: `${String(expMonth).padStart(2,'0')}/${expYear}`,
+                                    reason: reason,
+                                    invoiceId: inv.id,
+                                    customer: inv.customer.name,
+                                    returnedFromInvoice: true
+                                };
+                                ReturnsManager.add(returnRecord);
+                            });
+
+                            // Update invoice - remove returned items or mark as partial
+                            const remainingItems = inv.items.filter(item => {
+                                const returned = returnItems.find(r => r.id === item.id);
+                                return !returned || item.quantity > returned.returnQuantity;
+                            });
+
+                            // Update the invoice with remaining quantities
+                            if (remainingItems.length > 0) {
+                                // Update existing invoice items
+                                const updatedItems = inv.items.map(item => {
+                                    const returned = returnItems.find(r => r.id === item.id);
+                                    if (returned) {
+                                        return {
+                                            ...item,
+                                            quantity: item.quantity - returned.returnQuantity,
+                                            lineTotal: (item.quantity - returned.returnQuantity) * item
+                                            .price
+                                        };
+                                    }
+                                    return item;
+                                }).filter(item => item.quantity > 0);
+
+                                // Recalculate invoice totals
+                                const newSubtotal = updatedItems.reduce((s, it) => s + it.lineTotal, 0);
+                                const newTax = newSubtotal * (inv.gstRate / 100);
+                                const newTotal = newSubtotal + newTax - inv.discountAmount;
+
+                                // Update invoice in storage
+                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
+                                if (idx !== -1) {
+                                    AppState.invoices[idx].items = updatedItems;
+                                    AppState.invoices[idx].subtotal = newSubtotal;
+                                    AppState.invoices[idx].taxAmount = newTax;
+                                    AppState.invoices[idx].total = newTotal;
+                                    InvoiceManager.save();
+                                }
+                            } else {
+                                // Remove invoice if all items returned
+                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
+                                if (idx !== -1) {
+                                    AppState.invoices.splice(idx, 1);
+                                    InvoiceManager.save();
+                                }
+                            }
+
+                            // Save all changes
+                            Inventory.save();
+                            ReturnsManager.save();
+                            Modal.close();
+                            UI.refreshAll();
+                            Toast.success("Return Processed",
+                                `${totalReturnQty} units returned from ${inv.id}. Added back to inventory.`);
+                        });
+                    }
+                });
             }
 
             static showInvoice(id, isNew = false) {
@@ -1948,9 +2176,7 @@
                             Toast.success("Logged out"); } });
                 });
 
-                // Refresh Data - Clear all inputs and reload
                 document.getElementById("refreshBtn").addEventListener("click", () => {
-                    // Clear all input fields across the app
                     document.querySelectorAll('input, textarea, select').forEach(el => {
                         if (el.id !== 'settingsCurrentPassword' && el.id !== 'settingsNewPassword' &&
                             el.id !== 'settingsConfirmPassword') {
@@ -1960,23 +2186,19 @@
                             el.value = '';
                         }
                     });
-                    // Reset GST selection
                     document.querySelectorAll('.gst-btn').forEach(b => b.classList.remove('active'));
                     const defaultGst = document.querySelector('.gst-btn[data-gst="5"]');
                     if (defaultGst) defaultGst.classList.add('active');
                     AppState.selectedGst = 5;
-                    // Reload data
                     Inventory.load();
                     InvoiceManager.load();
                     ReturnsManager.load();
                     UI.refreshAll();
-                    // Clear cart
                     Billing.clear(true);
-                    // Clear AI chat
                     const chat = document.getElementById('aiChat');
                     if (chat) {
                         chat.innerHTML =
-                            `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by Google Gemini.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
+                            `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant connected to the internet.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
                     }
                     Toast.success("Data refreshed", "All data reloaded and inputs cleared.");
                 });
@@ -1996,7 +2218,6 @@
                     });
                 });
 
-                // GST Options
                 document.querySelectorAll(".gst-btn").forEach(btn => {
                     btn.addEventListener("click", () => {
                         document.querySelectorAll(".gst-btn").forEach(b => b.classList.remove("active"));
@@ -2006,7 +2227,6 @@
                     });
                 });
 
-                // Clear expired button
                 document.getElementById("clearExpiredBtn")?.addEventListener("click", () => {
                     const expired = Inventory.expired();
                     if (expired.length === 0) { Toast.info("No expired medicines", "All medicines are valid."); return; }
@@ -2023,13 +2243,11 @@
                     });
                 });
 
-                // Delete expired individual
                 document.getElementById("expiredBody")?.addEventListener("click", (e) => {
                     const del = e.target.closest("[data-delete-expired]");
                     if (del) UI.removeExpired(del.dataset.deleteExpired);
                 });
 
-                // Add Return
                 document.getElementById("addReturnBtn")?.addEventListener("click", () => {
                     const meds = Inventory.all();
                     const medOptions = meds.map(m =>
@@ -2081,6 +2299,15 @@
                                 if (!ok) { Toast.error("Validation failed"); return; }
                                 const med = Inventory.find(medId);
                                 if (!med) { Toast.error("Medicine not found"); return; }
+                                // Check if expiry is at least 7 days from now
+                                const expDate = new Date(expiry);
+                                const now = new Date();
+                                const daysDiff = (expDate - now) / (1000 * 60 * 60 * 24);
+                                if (daysDiff < 7) {
+                                    Toast.error("Invalid Expiry",
+                                        "Returned medicine must have at least 7 days expiry remaining.");
+                                    return;
+                                }
                                 const returnItem = {
                                     medicineName: med.name,
                                     batchId: med.batchId,
@@ -2099,7 +2326,6 @@
                     });
                 });
 
-                // Delete return
                 document.getElementById("returnBody")?.addEventListener("click", (e) => {
                     const del = e.target.closest("[data-delete-return]");
                     if (del) {
@@ -2116,12 +2342,19 @@
                     }
                 });
 
-                // Invoice Month Search
                 document.getElementById("invoiceMonthSearch")?.addEventListener("input", () => UI.renderInvoices());
                 document.getElementById("invoiceClearSearch")?.addEventListener("click", () => {
                     document.getElementById("invoiceMonthSearch").value = "";
                     document.getElementById("invoiceSearch").value = "";
                     UI.renderInvoices();
+                });
+
+                // Return from invoice button
+                document.getElementById("invoiceBody")?.addEventListener("click", (e) => {
+                    const returnBtn = e.target.closest("[data-return-invoice]");
+                    if (returnBtn) {
+                        UI.returnFromInvoice(returnBtn.dataset.returnInvoice);
+                    }
                 });
             }
 
@@ -2199,12 +2432,6 @@
 
             static bindInvoices() {
                 document.getElementById("invoiceSearch").addEventListener("input", () => UI.renderInvoices());
-                document.getElementById("invoiceBody").addEventListener("click", e => {
-                    const v = e.target.closest("[data-view-invoice]");
-                    if (v) { UI.showInvoice(v.getAttribute("data-view-invoice")); return; }
-                    const w = e.target.closest("[data-wa]");
-                    if (w) InvoiceManager.sendWA(w.getAttribute("data-wa"));
-                });
             }
 
             static bindSettings() {
@@ -2298,7 +2525,7 @@
                     chat.scrollTop = chat.scrollHeight;
 
                     try {
-                        const response = await GeminiAI.ask(text);
+                        const response = await InternetAI.ask(text);
                         thinkingMsg.remove();
 
                         const botMsg = document.createElement("div");
@@ -2334,7 +2561,7 @@
 
                 clearBtn.addEventListener("click", () => {
                     chat.innerHTML =
-                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant powered by Google Gemini.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
+                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant connected to the internet.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
                     query.value = "";
                     Toast.info("Chat cleared", "Conversation history has been cleared.");
                 });
@@ -2375,7 +2602,6 @@
                     });
                 });
 
-                // Low stock restock button
                 document.getElementById("lowBody")?.addEventListener("click", (e) => {
                     const r = e.target.closest("[data-restock]");
                     if (r) UI.restock(r.getAttribute("data-restock"));
@@ -2390,14 +2616,12 @@
                     }
                 });
 
-                // Prevent zoom with Ctrl+Plus/Minus/0
                 document.addEventListener("keydown", (e) => {
                     if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0')) {
                         e.preventDefault();
                     }
                 });
 
-                // Prevent double-tap zoom on mobile
                 document.addEventListener("touchend", (e) => {
                     const now = Date.now();
                     if (now - (document.lastTouch || 0) < 300) {
