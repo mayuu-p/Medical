@@ -85,6 +85,8 @@
         .btn-outline:hover { background: #f1f5f9 }
         .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px }
         .btn-block { width: 100% }
+        .btn-cart-add { background: #16a34a; color: #fff; border: none; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; margin: 2px 0; }
+        .btn-cart-add:hover { background: #15803d; transform: scale(1.02); }
 
         .badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 11px; font-weight: 800; letter-spacing: .02em }
         .badge-green { background: #dcfce7; color: #166534 }
@@ -297,8 +299,8 @@
         .ai-msg.bot { background: #f1f5f9; margin-right: auto; border-bottom-left-radius: 4px; }
         .ai-msg .ai-thinking { display: inline-block; animation: pulse 1.2s ease-in-out infinite; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-        .ai-msg .med-btn { display: inline-block; padding: 4px 14px; background: var(--accent); color: #fff; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 4px 4px 0 0; cursor: pointer; border: none; }
-        .ai-msg .med-btn:hover { background: var(--accent-dark); }
+        .ai-msg .med-btn { display: inline-block; padding: 4px 14px; background: #16a34a; color: #fff; border-radius: 20px; font-size: 11px; font-weight: 600; margin: 4px 4px 0 0; cursor: pointer; border: none; }
+        .ai-msg .med-btn:hover { background: #15803d; transform: scale(1.02); }
 
         /* Responsive */
         @media (max-width:1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr) } .pos-grid { grid-template-columns: 1fr } .two-col { grid-template-columns: 1fr } }
@@ -767,7 +769,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: Return modal with medicine selection, WhatsApp sharing, Details, AI cart add
+        //  FIXED: Return auto-populates from invoice, WhatsApp & Details working
         // =========================================================================
 
         // ---------- CONFIG ----------
@@ -853,10 +855,6 @@
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const year = now.getFullYear();
                 return `#${CONFIG.INVOICE.PREFIX}-${month}-${year}-${String(counter).padStart(4, '0')}`;
-            }
-            static getMonthYear(date) {
-                const d = new Date(date);
-                return d.toLocaleString('default', { month: 'long', year: 'numeric' });
             }
             static formatMonthYear(input) {
                 let val = input.replace(/\D/g, '');
@@ -1161,6 +1159,15 @@
                 const url = `https://wa.me/${m}?text=${encodeURIComponent(InvoiceManager.waText(inv))}`;
                 window.open(url, "_blank", "noopener");
                 Toast.success("WhatsApp opened", `Invoice ${inv.id} ready.`);
+            }
+            static deleteInvoice(id) {
+                const idx = AppState.invoices.findIndex(i => i.id === id);
+                if (idx !== -1) {
+                    AppState.invoices.splice(idx, 1);
+                    InvoiceManager.save();
+                    return true;
+                }
+                return false;
             }
         }
 
@@ -1712,116 +1719,182 @@
                         } });
             }
 
-            // ---------- RETURN MODAL WITH MEDICINE SELECTION ----------
-            static openReturnModal() {
-                const meds = Inventory.all().filter(m => m.stock > 0 && !Utils.isExpired(m.expiryMonth, m.expiryYear));
-                const medOptions = meds.map(m =>
-                    `<option value="${Utils.esc(m.id)}">${Utils.esc(m.name)} (${Utils.esc(m.batchId)}) - ${m.stock} units</option>`
-                ).join('');
+            // ---------- RETURN FROM INVOICE (AUTO-POPULATED) ----------
+            static returnFromInvoice(invoiceId) {
+                const inv = InvoiceManager.find(invoiceId);
+                if (!inv) { Toast.error("Invoice not found"); return; }
+
+                // Check if invoice is older than 7 days
+                const invDate = new Date(inv.timestamp);
+                const now = new Date();
+                const daysDiff = (now - invDate) / (1000 * 60 * 60 * 24);
+                if (daysDiff > 7) {
+                    Toast.error("Return window expired",
+                        "This invoice is older than 7 days. Returns are only allowed within 7 days of purchase.");
+                    return;
+                }
+
+                // Create return modal with auto-populated invoice data
+                const itemsHtml = inv.items.map((item, idx) => {
+                    // Check if this medicine exists in inventory
+                    const existingMed = Inventory.all().find(m => m.name === item.name && m.batchId === item.batchId);
+                    const maxQty = existingMed ? existingMed.stock + item.quantity : item.quantity;
+                    const expiryDate = existingMed ?
+                        `${String(existingMed.expiryMonth).padStart(2,'0')}/${existingMed.expiryYear}` :
+                        'N/A';
+
+                    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+                        <div>
+                            <span class="cell-strong">${Utils.esc(item.name)}</span>
+                            <small class="cell-sub">Batch: ${Utils.esc(item.batchId)}</small>
+                            <small class="cell-sub">Expiry: ${expiryDate}</small>
+                            <small class="cell-sub">Original Qty: ${item.quantity} × ₹${item.price} = ₹${item.lineTotal}</small>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" id="returnQty_${idx}" min="0" max="${item.quantity}" value="${item.quantity}" style="width:70px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;" />
+                            <span style="font-size:12px;color:var(--slate-500)">/ ${item.quantity}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const totalRefund = inv.total;
 
                 Modal.open({
-                    title: "↩️ Add Return",
-                    subtitle: "Record a medicine return",
+                    title: "↩️ Return Items from Invoice",
+                    subtitle: `${inv.id} - ${inv.customer.name}`,
                     body: `
-                        <div class="field">
-                            <label class="field-label" for="returnMed">Select Medicine</label>
-                            <select class="input" id="returnMed">
-                                <option value="">Select Medicine</option>
-                                ${medOptions}
-                            </select>
-                            <span class="err" id="errReturnMed"></span>
+                        <div style="margin-bottom:12px;padding:8px 12px;background:#dcfce7;border-radius:8px;font-size:13px;color:#166534;">
+                            💰 Total Refund Amount: <strong>₹${totalRefund.toFixed(2)}</strong>
                         </div>
-                        <div class="field">
-                            <label class="field-label" for="returnQty">Quantity Returned</label>
-                            <input class="input" id="returnQty" type="number" min="1" placeholder="Enter quantity" />
-                            <span class="err" id="errReturnQty"></span>
+                        <div style="margin-bottom:12px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
+                            📦 Items will be added back to inventory with 7-day expiry from invoice date
                         </div>
-                        <div class="field">
-                            <label class="field-label" for="returnExpiry">Expiry Date</label>
-                            <input class="input" id="returnExpiry" type="date" />
-                            <span class="err" id="errReturnExpiry"></span>
+                        <div style="max-height:300px;overflow-y:auto;">
+                            ${itemsHtml}
                         </div>
-                        <div class="field">
-                            <label class="field-label" for="returnReason">Reason (Optional)</label>
-                            <input class="input" id="returnReason" placeholder="e.g. Damaged, Expired, Wrong item" />
+                        <div class="field" style="margin-top:12px;">
+                            <label class="field-label" for="returnReasonInvoice">Reason for Return</label>
+                            <input class="input" id="returnReasonInvoice" placeholder="e.g. Expired, Damaged, Wrong item, Customer request" value="Customer return" />
+                        </div>
+                        <div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e;">
+                            ⚠️ Returned items will be added to inventory with expiry: <strong>${new Date(invDate.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]}</strong>
                         </div>
                     `,
                     footer: `<button class="btn btn-outline" data-cancel type="button">Cancel</button>
-                             <button class="btn btn-success" data-save-return type="button">Save Return</button>`,
+                             <button class="btn btn-success" data-process-return type="button">Process Return (₹${totalRefund.toFixed(2)})</button>`,
                     onMount(_b, foot) {
                         foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
+                        foot.querySelector("[data-process-return]").addEventListener("click", () => {
+                            const reason = document.getElementById("returnReasonInvoice").value.trim() ||
+                                "Customer return";
+                            const returnItems = [];
+                            let totalReturnQty = 0;
+                            let totalRefundAmount = 0;
 
-                        // Auto-fill expiry when medicine is selected
-                        const medSelect = document.getElementById("returnMed");
-                        const expiryInput = document.getElementById("returnExpiry");
-                        const qtyInput = document.getElementById("returnQty");
+                            inv.items.forEach((item, idx) => {
+                                const qtyInput = document.getElementById(`returnQty_${idx}`);
+                                if (qtyInput) {
+                                    const qty = parseInt(qtyInput.value);
+                                    if (qty > 0 && qty <= item.quantity) {
+                                        returnItems.push({
+                                            ...item,
+                                            returnQuantity: qty
+                                        });
+                                        totalReturnQty += qty;
+                                        totalRefundAmount += (qty / item.quantity) * item.lineTotal;
+                                    }
+                                }
+                            });
 
-                        medSelect.addEventListener("change", function() {
-                            const medId = this.value;
-                            if (medId) {
-                                const med = Inventory.find(medId);
-                                if (med) {
-                                    // Set max quantity
-                                    qtyInput.max = med.stock;
-                                    qtyInput.placeholder = `Max ${med.stock} units`;
-                                    // Set expiry date 7 days from now as default
-                                    const date = new Date();
-                                    date.setDate(date.getDate() + 7);
-                                    expiryInput.value = date.toISOString().split('T')[0];
+                            if (returnItems.length === 0 || totalReturnQty === 0) {
+                                Toast.error("No items selected", "Please select at least one item to return.");
+                                return;
+                            }
+
+                            // Process each return
+                            returnItems.forEach(item => {
+                                const newExpiry = new Date(invDate);
+                                newExpiry.setDate(newExpiry.getDate() + 7);
+                                const expMonth = newExpiry.getMonth() + 1;
+                                const expYear = newExpiry.getFullYear();
+
+                                // Check if medicine exists in inventory
+                                const existing = Inventory.all().find(m => m.name === item.name && m.batchId ===
+                                    item.batchId);
+                                if (existing) {
+                                    Inventory.update(existing.id, {
+                                        stock: existing.stock + item.returnQuantity
+                                    });
+                                } else {
+                                    const newMed = {
+                                        id: generateUniqueId(),
+                                        batchId: item.batchId + '-RET',
+                                        name: item.name,
+                                        generic: item.generic || "—",
+                                        category: item.category || "General",
+                                        price: item.price,
+                                        stock: item.returnQuantity,
+                                        expiryMonth: expMonth,
+                                        expiryYear: expYear,
+                                        createdAt: new Date().toISOString()
+                                    };
+                                    Inventory.add(newMed);
+                                }
+
+                                // Record return
+                                const returnRecord = {
+                                    medicineName: item.name,
+                                    batchId: item.batchId,
+                                    medicineId: item.id,
+                                    quantity: item.returnQuantity,
+                                    expiryDate: `${String(expMonth).padStart(2,'0')}/${expYear}`,
+                                    reason: reason,
+                                    invoiceId: inv.id,
+                                    customer: inv.customer.name,
+                                    refundAmount: (item.returnQuantity / item.quantity) * item.lineTotal,
+                                    returnedFromInvoice: true
+                                };
+                                AppState.returns.unshift(returnRecord);
+                            });
+
+                            // Update the invoice - remove returned items
+                            const updatedItems = inv.items.map(item => {
+                                const returned = returnItems.find(r => r.id === item.id);
+                                if (returned) {
+                                    return {
+                                        ...item,
+                                        quantity: item.quantity - returned.returnQuantity,
+                                        lineTotal: (item.quantity - returned.returnQuantity) * item
+                                        .price
+                                    };
+                                }
+                                return item;
+                            }).filter(item => item.quantity > 0);
+
+                            if (updatedItems.length > 0) {
+                                const newSubtotal = updatedItems.reduce((s, it) => s + it.lineTotal, 0);
+                                const newTax = newSubtotal * (inv.gstRate / 100);
+                                const newTotal = newSubtotal + newTax - inv.discountAmount;
+                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
+                                if (idx !== -1) {
+                                    AppState.invoices[idx].items = updatedItems;
+                                    AppState.invoices[idx].subtotal = newSubtotal;
+                                    AppState.invoices[idx].taxAmount = newTax;
+                                    AppState.invoices[idx].total = newTotal;
                                 }
                             } else {
-                                qtyInput.max = '';
-                                qtyInput.placeholder = 'Enter quantity';
-                                expiryInput.value = '';
+                                const idx = AppState.invoices.findIndex(i => i.id === inv.id);
+                                if (idx !== -1) {
+                                    AppState.invoices.splice(idx, 1);
+                                }
                             }
-                        });
 
-                        foot.querySelector("[data-save-return]").addEventListener("click", () => {
-                            const medId = document.getElementById("returnMed").value;
-                            const qty = parseInt(document.getElementById("returnQty").value);
-                            const expiry = document.getElementById("returnExpiry").value;
-                            const reason = document.getElementById("returnReason").value.trim();
-                            let ok = true;
-                            UI.setError("returnMed", "");
-                            UI.setError("returnQty", "");
-                            UI.setError("returnExpiry", "");
-                            if (!medId) { UI.setError("returnMed",
-                                "Please select a medicine."); ok = false; }
-                            if (!qty || qty < 1) { UI.setError("returnQty",
-                                "Enter a valid quantity."); ok = false; }
-                            if (!expiry) { UI.setError("returnExpiry",
-                                "Please select expiry date."); ok = false; }
-                            if (!ok) { Toast.error("Validation failed"); return; }
-                            const med = Inventory.find(medId);
-                            if (!med) { Toast.error("Medicine not found"); return; }
-                            if (qty > med.stock) {
-                                Toast.error("Invalid quantity",
-                                    `Only ${med.stock} units available.`);
-                                return;
-                            }
-                            // Check if expiry is at least 7 days from now
-                            const expDate = new Date(expiry);
-                            const now = new Date();
-                            const daysDiff = (expDate - now) / (1000 * 60 * 60 * 24);
-                            if (daysDiff < 7) {
-                                Toast.error("Invalid Expiry",
-                                    "Returned medicine must have at least 7 days expiry remaining.");
-                                return;
-                            }
-                            const returnItem = {
-                                medicineName: med.name,
-                                batchId: med.batchId,
-                                medicineId: med.id,
-                                quantity: qty,
-                                expiryDate: expiry,
-                                reason: reason || "No reason provided"
-                            };
-                            AppState.returns.unshift(returnItem);
-                            Storage.save(CONFIG.KEYS.RETURNS, AppState.returns);
+                            Inventory.save();
+                            InvoiceManager.save();
                             Modal.close();
                             UI.refreshAll();
-                            Toast.success("Return recorded",
-                                `${med.name} - ${qty} units returned.`);
+                            Toast.success("Return Processed",
+                                `${totalReturnQty} units returned. Refund amount: ₹${totalRefundAmount.toFixed(2)}`);
                         });
                     }
                 });
@@ -2076,27 +2149,13 @@
                     UI.renderInvoices();
                 });
 
-                // Return from invoice button - show return modal
+                // Return from invoice button
                 document.getElementById("invoiceBody")?.addEventListener("click", (e) => {
                     const returnBtn = e.target.closest("[data-return-invoice]");
                     if (returnBtn) {
-                        UI.openReturnModal();
+                        UI.returnFromInvoice(returnBtn.dataset.returnInvoice);
                     }
                 });
-
-                // Add Return button in sidebar - open return modal
-                // We need to add a return button in the sidebar or use the existing one
-                // Since we removed Returns section, we'll use the invoice return button
-                // Also add a global return button in the header or somewhere accessible
-                // We'll add a return button in the invoice section header
-                const invoiceHead = document.querySelector('#view-invoices .page-head');
-                if (invoiceHead) {
-                    const returnBtn = document.createElement('button');
-                    returnBtn.className = 'btn btn-danger btn-sm';
-                    returnBtn.innerHTML = '↩️ Return Medicine';
-                    returnBtn.addEventListener('click', UI.openReturnModal);
-                    invoiceHead.appendChild(returnBtn);
-                }
             }
 
             static bindPOS() {
@@ -2271,7 +2330,7 @@
                         const botMsg = document.createElement("div");
                         botMsg.className = "ai-msg bot";
 
-                        // Add medicine buttons if response contains medicine names
+                        // Add medicine buttons for each medicine mentioned
                         let formatted = response;
                         const medNames = Inventory.all().map(m => m.name);
                         medNames.forEach(med => {
