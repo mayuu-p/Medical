@@ -85,7 +85,7 @@
         .btn-outline:hover { background: #f1f5f9 }
         .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px }
         .btn-block { width: 100% }
-        .btn-cart-add { background: #16a34a; color: #fff; border: none; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; margin: 2px 0; }
+        .btn-cart-add { background: #16a34a; color: #fff; border: none; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; margin: 2px 4px; }
         .btn-cart-add:hover { background: #15803d; transform: scale(1.02); }
 
         .badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 11px; font-weight: 800; letter-spacing: .02em }
@@ -292,7 +292,7 @@
 
         footer.legal { margin-left: var(--sidebar-w); padding: 14px 22px 26px; font-size: 11px; color: var(--slate-500); font-weight: 600; text-align: center }
 
-        /* AI Chat - ChatGPT Style */
+        /* AI Chat - Beautiful formatted responses */
         .ai-chat { max-height: 500px; overflow-y: auto; padding: 4px 0; display: flex; flex-direction: column; gap: 4px; }
         .ai-msg { padding: 12px 16px; border-radius: 14px; margin-bottom: 4px; max-width: 92%; word-wrap: break-word; line-height: 1.6; font-size: 13px; }
         .ai-msg.user { background: #e0f2fe; margin-left: auto; border-bottom-right-radius: 4px; }
@@ -301,6 +301,12 @@
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         .ai-msg .med-btn { display: inline-block; padding: 4px 14px; background: #16a34a; color: #fff; border-radius: 20px; font-size: 11px; font-weight: 600; margin: 4px 4px 0 0; cursor: pointer; border: none; }
         .ai-msg .med-btn:hover { background: #15803d; transform: scale(1.02); }
+        .ai-msg .ai-med-list { margin: 4px 0; }
+        .ai-msg .ai-med-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        .ai-msg .ai-med-item:last-child { border-bottom: none; }
+        .ai-msg .ai-section-title { font-weight: 800; font-size: 14px; margin: 8px 0 4px; color: var(--slate-800); }
+        .ai-msg .ai-info-text { color: var(--slate-700); }
+        .ai-msg .ai-warning { font-size: 11px; color: var(--slate-500); margin-top: 8px; padding: 8px 12px; background: #fef3c7; border-radius: 8px; }
 
         /* Responsive */
         @media (max-width:1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr) } .pos-grid { grid-template-columns: 1fr } .two-col { grid-template-columns: 1fr } }
@@ -769,7 +775,7 @@
         "use strict";
         // =========================================================================
         //  MEDICAL ERP — Full Enterprise System
-        //  FIXED: Invoice Details modal with WhatsApp button working
+        //  AI: Beautifully formatted responses with Add to Cart buttons
         // =========================================================================
 
         // ---------- CONFIG ----------
@@ -1719,7 +1725,7 @@
                         } });
             }
 
-            // ---------- SHOW INVOICE DETAILS WITH WORKING WHATSAPP ----------
+            // ---------- SHOW INVOICE DETAILS ----------
             static showInvoice(id, isNew = false) {
                 const inv = InvoiceManager.find(id);
                 if (!inv) {
@@ -1727,7 +1733,6 @@
                     return;
                 }
 
-                // Build items rows
                 const rows = inv.items.map(it =>
                     `<tr>
                         <td><span class="cell-strong">${Utils.esc(it.name)}</span><small class="cell-sub">${Utils.esc(it.batchId)}</small></td>
@@ -1787,10 +1792,7 @@
                         <button class="btn btn-success" data-wa-modal type="button">📲 Send WhatsApp</button>
                     `,
                     onMount(_body, foot) {
-                        // Close button
                         foot.querySelector("[data-cancel]").addEventListener("click", Modal.close);
-
-                        // WhatsApp button - works perfectly
                         foot.querySelector("[data-wa-modal]").addEventListener("click", function() {
                             InvoiceManager.sendWA(inv.id);
                         });
@@ -2196,7 +2198,6 @@
                     if (returnBtn) {
                         UI.returnFromInvoice(returnBtn.dataset.returnInvoice);
                     }
-                    // Details and WhatsApp are handled via data-view-invoice and data-wa in renderInvoices
                 });
             }
 
@@ -2341,6 +2342,7 @@
                 });
             }
 
+            // ---------- AI WITH BEAUTIFUL FORMATTED RESPONSES ----------
             static bindAI() {
                 const askBtn = document.getElementById("aiAskBtn");
                 const clearBtn = document.getElementById("aiClearBtn");
@@ -2368,30 +2370,16 @@
 
                     setTimeout(() => {
                         thinkingMsg.remove();
-                        let response = getAIResponse(text);
+
+                        // Get the AI response with formatted medicine suggestions
+                        const response = getAIResponse(text);
                         const botMsg = document.createElement("div");
                         botMsg.className = "ai-msg bot";
-
-                        let formatted = response;
-                        const medNames = Inventory.all().map(m => m.name);
-                        medNames.forEach(med => {
-                            if (formatted.includes(med)) {
-                                const medObj = Inventory.all().find(m => m.name === med);
-                                if (medObj && medObj.stock > 0) {
-                                    const btnHtml =
-                                        `<button class="med-btn" data-add="${medObj.id}">➕ Add ${med} to Cart</button>`;
-                                    formatted = formatted.replace(med, `${med} ${btnHtml}`);
-                                }
-                            }
-                        });
-
-                        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                        formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-                        formatted = formatted.replace(/\n/g, '<br>');
-                        botMsg.innerHTML = formatted;
+                        botMsg.innerHTML = response;
                         chat.appendChild(botMsg);
                         chat.scrollTop = chat.scrollHeight;
 
+                        // Attach event listeners to all "Add to Cart" buttons
                         botMsg.querySelectorAll('.med-btn').forEach(btn => {
                             btn.addEventListener('click', function() {
                                 const id = this.dataset.add;
@@ -2407,42 +2395,317 @@
                         askBtn.disabled = false;
                         askBtn.textContent = "Ask";
                         query.value = "";
-                    }, 800);
+                    }, 600);
                 };
 
                 function getAIResponse(text) {
                     const q = text.toLowerCase();
+
+                    // Helper to get available medicines with prices
+                    const getAvailableMeds = (names) => {
+                        const meds = [];
+                        names.forEach(name => {
+                            const med = Inventory.all().find(m => m.name === name);
+                            if (med && med.stock > 0 && !Utils.isExpired(med.expiryMonth, med.expiryYear)) {
+                                meds.push(med);
+                            }
+                        });
+                        return meds;
+                    };
+
+                    // Build medicine list HTML with Add to Cart buttons
+                    const buildMedList = (meds) => {
+                        if (meds.length === 0) return '<span style="color:var(--slate-500);">No medicines currently in stock.</span>';
+                        let html = '<div class="ai-med-list">';
+                        meds.forEach(med => {
+                            html += `
+                                <div class="ai-med-item">
+                                    <span><strong>${Utils.esc(med.name)}</strong> <span style="color:var(--slate-500);font-weight:600;">${Utils.inr(med.price)}</span></span>
+                                    <button class="med-btn" data-add="${med.id}">➕ Add to Cart</button>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        return html;
+                    };
+
+                    // --- FEVER ---
                     if (q.includes("fever") || q.includes("bukhar") || q.includes("बुखार")) {
-                        return "Fever is an elevated body temperature. Treatment: Rest, hydration, **paracetamol (Dolo 650mg, Calpol 500mg)**. If fever exceeds 103°F or lasts more than 3 days, consult a doctor.";
+                        const meds = getAvailableMeds(["Dolo 650mg", "Calpol 500mg", "Crocin Advance", "Combiflam"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🌡️ FEVER</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Fever (pyrexia) is an elevated body temperature above the normal range of 98.6°F (37°C). It's a common symptom of various infections and conditions.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Bacterial or viral infections, heat exhaustion, inflammatory conditions, medications, or cancer.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Rest, hydration, paracetamol (Dolo 650mg, Calpol 500mg), ibuprofen. Seek medical help if fever exceeds 103°F or lasts more than 3 days.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Stay hydrated, maintain good hygiene, avoid exposure to infections.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
+
+                    // --- HEADACHE ---
                     if (q.includes("headache") || q.includes("sir dard") || q.includes("सिरदर्द")) {
-                        return "Headache can be caused by stress, dehydration, or sinusitis. Treatment: Rest, hydration, **paracetamol or ibuprofen**. Available medicines: **Dolo 650mg, Combiflam, Crocin Advance**.";
+                        const meds = getAvailableMeds(["Dolo 650mg", "Combiflam", "Crocin Advance"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">😫 HEADACHE</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Headache is pain in the head or upper neck. It can be tension-type, migraine, cluster, or caused by other conditions.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Stress, tension, dehydration, sinusitis, migraine, eye strain, caffeine withdrawal.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Rest, hydration, paracetamol or ibuprofen. For migraines, consult a doctor.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Regular sleep, hydration, stress management, avoiding triggers.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
+
+                    // --- TOOTHACHE ---
+                    if (q.includes("toothache") || q.includes("dath") || q.includes("दांत") || q.includes("tooth")) {
+                        const meds = getAvailableMeds(["Dolo 650mg", "Combiflam", "Voveran SR 100", "Zerodol SP"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🦷 TOOTHACHE</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Toothache is pain in or around a tooth. It can be caused by tooth decay, infection, gum disease, or injury.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Dental cavity, abscess, cracked tooth, gum infection, wisdom tooth eruption, sinusitis.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Pain relievers (paracetamol or ibuprofen), clove oil, salt water rinse. See a dentist immediately.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Regular brushing, flossing, dental check-ups, avoid sugary foods.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
+                    }
+
+                    // --- COLD ---
                     if (q.includes("cold") || q.includes("jukam") || q.includes("जुकाम")) {
-                        return "Common cold is a viral infection. Treatment: Rest, fluids, **antihistamines (Alerid 10mg, Montair-LC)**. Steam inhalation helps. Usually resolves in 7-10 days.";
+                        const meds = getAvailableMeds(["Alerid 10mg", "Montair-LC", "Levocetirizine 5mg", "Ascoril LS Syrup 100ml"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🤧 COLD</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Common cold is a viral infection of the upper respiratory tract. It's usually harmless and self-limiting.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Rhinovirus, coronavirus, adenovirus, RSV. Spread through airborne droplets or contact with infected surfaces.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Rest, fluids, decongestants, antihistamines like Cetirizine (Alerid), steam inhalation.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Hand washing, avoiding close contact with infected individuals, strengthening immunity.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("toothache") || q.includes("dath") || q.includes("दांत")) {
-                        return "Toothache can be caused by cavity, infection, or gum disease. Treatment: **Pain relievers (Dolo 650mg, Combiflam)** , clove oil, salt water rinse. See a dentist immediately.";
+
+                    // --- ACIDITY ---
+                    if (q.includes("acidity") || q.includes("esiditi") || q.includes("एसिडिटी") || q.includes("acid")) {
+                        const meds = getAvailableMeds(["Pan-D", "Pantocid 40mg", "Omez 20mg", "Rantac 150mg"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🔥 ACIDITY</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Acidity or acid reflux occurs when stomach acid flows back into the esophagus, causing heartburn and discomfort.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Spicy foods, citrus, caffeine, alcohol, smoking, obesity, pregnancy, Hiatal hernia.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Antacids, proton pump inhibitors like Pantoprazole (Pantocid), Omeprazole (Omez), lifestyle changes.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Avoid trigger foods, eat small meals, don't lie down immediately after eating.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("acidity") || q.includes("esiditi") || q.includes("एसिडिटी")) {
-                        return "Acidity occurs when stomach acid flows back into the esophagus. Treatment: Antacids, **Pantoprazole (Pantocid 40mg), Omeprazole (Omez 20mg)** . Avoid spicy foods.";
+
+                    // --- INFECTION ---
+                    if (q.includes("infection") || q.includes("संक्रमण") || q.includes("sankraman")) {
+                        const meds = getAvailableMeds(["Moxikind-CV 625", "Augmentin 625 DUO", "Azithral 500mg", "Ciplox 500"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🦠 INFECTION</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Infection occurs when harmful microorganisms (bacteria, viruses, fungi, parasites) enter and multiply in the body.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Bacterial, viral, fungal, or parasitic pathogens. Transmission through contact, air, food, water, or vectors.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Antibiotics for bacterial infections, antivirals, antifungals. Always complete the full course.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Good hygiene, vaccination, safe food handling, proper wound care.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("diabetes") || q.includes("डायबिटीज")) {
-                        return "Diabetes is a chronic condition with high blood sugar. Treatment: **Metformin (Glycomet 500), Glimepiride (Glimisave M2)** , diet control, regular exercise.";
+
+                    // --- DIABETES ---
+                    if (q.includes("diabetes") || q.includes("डायबिटीज") || q.includes("dayabites")) {
+                        const meds = getAvailableMeds(["Glycomet 500", "Glimisave M2", "Januvia 50mg", "Istamet 50/500"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🩸 DIABETES</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Diabetes is a chronic metabolic disorder characterized by high blood sugar levels. Type 1, Type 2, and Gestational.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Type 1: Autoimmune destruction of insulin-producing cells. Type 2: Insulin resistance and beta-cell dysfunction. Genetic and lifestyle factors.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Insulin, oral medications like Metformin (Glycomet), Glimepiride (Glimisave), Sitagliptin (Januvia). Diet and exercise.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Healthy diet, regular exercise, maintain healthy weight.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("infection")) {
-                        return "Infection can be bacterial, viral, or fungal. Bacterial infections need antibiotics like **Moxikind-CV 625, Augmentin 625 DUO, Azithral 500mg**. Consult a doctor.";
-                    }
+
+                    // --- PAIN RELIEF ---
                     if (q.includes("pain") || q.includes("dard") || q.includes("दर्द")) {
-                        return "Pain relief options: **Dolo 650mg** (mild pain), **Combiflam** (moderate pain), **Voveran SR 100** (severe pain).";
+                        const meds = getAvailableMeds(["Dolo 650mg", "Combiflam", "Voveran SR 100", "Zerodol SP", "Ultracet"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">💊 PAIN RELIEF</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Pain relief involves managing acute or chronic pain using medications, physical therapy, or other interventions.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Types:</strong> Acute pain (short-term), chronic pain (long-term), neuropathic pain, musculoskeletal pain.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> NSAIDs, paracetamol, opioids (for severe pain), physical therapy, acupuncture.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Maintain good posture, regular exercise, avoid repetitive strain.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("math") || q.includes("calculate") || q.includes("solve")) {
-                        return "I can help with math! Please specify your calculation clearly. For example: 'What is 25 × 14?' = **350**";
+
+                    // --- COUGH ---
+                    if (q.includes("cough") || q.includes("khansi") || q.includes("खांसी")) {
+                        const meds = getAvailableMeds(["Ascoril LS Syrup 100ml", "Benadryl Cough Syrup", "Asthalin Inhaler"]);
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🤧 COUGH</div>
+                            <div style="margin-top:4px;color:var(--slate-700);">
+                                <strong>Info:</strong> Cough is a reflex action to clear the airways of mucus, irritants, or foreign particles. It can be acute or chronic.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Causes:</strong> Viral infections, allergies, asthma, GERD, smoking, or environmental irritants.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                <strong>Treatment:</strong> Cough suppressants, expectorants, antihistamines, bronchodilators.
+                            </div>
+                            <div style="margin-top:10px;font-weight:700;color:var(--slate-800);">✅ Recommended Medicines (In Stock):</div>
+                            ${buildMedList(meds)}
+                            <div style="margin-top:8px;color:var(--slate-700);">
+                                <strong>Prevention:</strong> Avoid smoking, stay hydrated, manage allergies.
+                            </div>
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
                     }
-                    if (q.includes("how are you")) {
-                        return "I'm doing great! I'm an AI health assistant here to help you with any health-related questions. How can I assist you today?";
+
+                    // --- MATH ---
+                    if (q.includes("math") || q.includes("calculate") || q.includes("solve") || q.includes("×") || q.includes("*")) {
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🧮 MATH</div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                I can help with math! Please specify your calculation clearly. For example: <strong>"What is 25 × 14?"</strong> = <strong>350</strong>
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                Try asking: "Calculate 15% of 200" or "What is the square root of 144?"
+                            </div>
+                        `;
                     }
-                    return "I'm your AI Health Assistant. Please ask about: **fever, headache, cold, toothache, acidity, diabetes, infection, pain relief**, or any medicine name.";
+
+                    // --- GREETING ---
+                    if (q.includes("how are you") || q.includes("hi") || q.includes("hello") || q.includes("hey")) {
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">👋 HELLO!</div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                I'm doing great! I'm an AI health assistant here to help you with any health-related questions.
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                💡 <strong>You can ask me about:</strong><br>
+                                • Fever, cold, headache, toothache<br>
+                                • Acidity, diabetes, infection, pain relief<br>
+                                • Any medicine name and its uses<br>
+                                • Health tips and precautions
+                            </div>
+                            <div style="margin-top:6px;color:var(--slate-500);font-size:12px;">
+                                How can I assist you today?
+                            </div>
+                        `;
+                    }
+
+                    // --- DEFAULT / GENERAL ---
+                    // Check if any medicine name is mentioned
+                    const allMeds = Inventory.all().filter(m => m.stock > 0 && !Utils.isExpired(m.expiryMonth, m.expiryYear));
+                    const mentionedMeds = allMeds.filter(m => q.includes(m.name.toLowerCase()) || q.includes(m.generic
+                    .toLowerCase()));
+
+                    if (mentionedMeds.length > 0) {
+                        return `
+                            <div style="font-weight:800;font-size:15px;color:var(--slate-800);">💊 MEDICINE INFORMATION</div>
+                            <div style="margin-top:6px;color:var(--slate-700);">
+                                Here are the medicines I found matching your query:
+                            </div>
+                            ${buildMedList(mentionedMeds.slice(0, 8))}
+                            <div class="ai-warning">⚠️ This information is for educational purposes only. Always consult a qualified healthcare professional.</div>
+                        `;
+                    }
+
+                    return `
+                        <div style="font-weight:800;font-size:15px;color:var(--slate-800);">🤖 AI Health Assistant</div>
+                        <div style="margin-top:6px;color:var(--slate-700);">
+                            I'm your AI Health Assistant. Please ask about:
+                        </div>
+                        <div style="margin-top:6px;color:var(--slate-700);padding-left:12px;">
+                            • <strong>Fever</strong> — symptoms, treatment, medicines<br>
+                            • <strong>Headache</strong> — causes, relief, prevention<br>
+                            • <strong>Toothache</strong> — causes, remedies, when to see a dentist<br>
+                            • <strong>Cold</strong> — symptoms, treatment, medicines<br>
+                            • <strong>Acidity</strong> — causes, treatment, prevention<br>
+                            • <strong>Infection</strong> — types, treatment, antibiotics<br>
+                            • <strong>Diabetes</strong> — management, medicines, prevention<br>
+                            • <strong>Pain Relief</strong> — options, medicines, types<br>
+                            • <strong>Any medicine name</strong> — availability, price, uses
+                        </div>
+                        <div style="margin-top:8px;color:var(--slate-500);font-size:12px;">
+                            💡 <strong>Tip:</strong> Ask in English, Hindi, or Hinglish!
+                        </div>
+                    `;
                 }
 
                 askBtn.addEventListener("click", () => {
@@ -2454,7 +2717,7 @@
 
                 clearBtn.addEventListener("click", () => {
                     chat.innerHTML =
-                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...</div>`;
+                        `<div class="ai-msg bot">👋 Hello! I'm your AI Health Assistant.<br><br>💡 <strong>I can help you with:</strong><br>• Medicine information and uses<br>• Disease symptoms and treatments<br>• Health tips and precautions<br>• General knowledge questions<br>• Math calculations<br>• And much more...<br><br>Ask me anything in <strong>English, Hindi, or Hinglish</strong>!</div>`;
                     query.value = "";
                     Toast.info("Chat cleared", "Conversation history has been cleared.");
                 });
